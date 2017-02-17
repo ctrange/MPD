@@ -46,6 +46,11 @@ static constexpr struct {
 	unsigned long recipe;
 	const char *name;
 } soxr_quality_table[] = {
+	{ SOXR_32_BITQ, "ultra high" }, //SOXR_32_BITQ from soxr
+ 	{ SOXR_LINEAR_PHASE, "linear phase"}, //SOXR SOXR_LINEAR_PHASE 
+ 	{ SOXR_INTERMEDIATE_PHASE, "intermediate phase"}, //SOXR SOXR_INTERMEDIATE_PHASE
+ 	{ SOXR_MINIMUM_PHASE, "minimum phase"}, //SOXR SOXR_MINIMUM_PHASE
+ 	{ SOXR_STEEP_FILTER, "steep filter"},// SOXR SOXR_STEEP_FILTER
 	{ SOXR_VHQ, "very high" },
 	{ SOXR_HQ, "high" },
 	{ SOXR_MQ, "medium" },

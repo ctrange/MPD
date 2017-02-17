@@ -8,7 +8,16 @@ Here is the features
 Link to this fork on Github as below
 https://github.com/xxxbugxxxx/MPD
 -SACD ISO support -no need to covert to DSF/DFF, directly play SACD ISO file -DSD_U32 based Native DSD support (Not DOP) for certain XMOS based USB interface.
-* Adaptive up sampling, aka upsample 44.1Khz multiples to 352.8khz, and up sample 48k multiples to 384khz (currently hard coded in DecoderAPI.cxx, you have to change the code to tailor to your DAC capabilities) 
+-Adaptive up sampling, aka upsample 44.1Khz multiples to 352.8khz, and up sample 48k multiples to 384khz (currently hard coded in DecoderControl.cxx, you have to change the code to tailor to your DAC capabilities) 
+-Exposed more filter from libsoxr 
+  { SOXR_32_BITQ, "ultra high" }, //SOXR_32_BITQ from soxr
+  { SOXR_LINEAR_PHASE, "linear phase"}, //SOXR SOXR_LINEAR_PHASE 
+  { SOXR_INTERMEDIATE_PHASE, "intermediate phase"}, //SOXR SOXR_INTERMEDIATE_PHASE
+  { SOXR_MINIMUM_PHASE, "minimum phase"}, //SOXR SOXR_MINIMUM_PHASE
+  { SOXR_STEEP_FILTER, "steep filter"},// SOXR SOXR_STEEP_FILTER
+
+- Upconversion all PCM less than 32bit to 30bit, 2bit Head room for converting to 32 bit depth to avoid overshoot.
+
 
 process to install
 

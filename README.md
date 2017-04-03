@@ -26,8 +26,10 @@ before using this fork please take a look at the following article about how to 
 https://www.musicpd.org/doc/user/install_source.html
 
 
-sudo apt-get install build-essential automake autoconf libtool pkg-config libcurl4-openssl-dev intltool libxml2-dev libgtk2.0-dev libnotify-dev libglib2.0-dev libevent-dev dh-make
-sudo apt-get install libupnp4-dev libboost1.55-dev libmpdclient-dev libsystemd-dev libicu-dev libexpat1-dev libssl-dev
+
+sudo apt-get install build-essential automake autoconf libtool pkg-config libcurl4-openssl-dev intltool libxml2-dev libgtk2.0-dev libnotify-dev libglib2.0-dev libevent-dev dh-make libupnp4-dev libboost1.55-dev libmpdclient-dev libsystemd-dev libicu-dev libexpat1-dev libssl-dev
+
+
 
 git clone https://github.com/xxxbugxxxx/MPD cd MPD
 ./autogen.sh 

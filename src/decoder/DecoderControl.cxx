@@ -70,14 +70,16 @@ DecoderControl::SetReady(const AudioFormat audio_format,
 
 	if (out_audio_format.format!=SampleFormat::DSD) {
         if (out_audio_format.sample_rate==44100||out_audio_format.sample_rate==88200||out_audio_format.sample_rate==176400 )
-            {  out_audio_format.sample_rate=352800;
+            {  
+	       //out_audio_format.sample_rate=352800;
                out_audio_format.format=SampleFormat::S32;
                 }
         
                         
         if (out_audio_format.sample_rate==96000||out_audio_format.sample_rate==48000||out_audio_format.sample_rate==192000)
-           { out_audio_format.sample_rate=384000;
-             out_audio_format.format=SampleFormat::S32;       
+           { 
+	      //out_audio_format.sample_rate=384000;
+              out_audio_format.format=SampleFormat::S32;       
                 }
         }
 

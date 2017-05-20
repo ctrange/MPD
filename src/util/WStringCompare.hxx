@@ -35,9 +35,9 @@
 #include <wchar.h>
 
 static inline bool
-StringIsEmpty(const wchar_t *string)
+StringIsEmpty(const wchar_t *string) noexcept
 {
-  return *string == 0;
+	return *string == 0;
 }
 
 gcc_pure

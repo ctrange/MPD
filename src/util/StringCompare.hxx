@@ -38,9 +38,9 @@
 #endif
 
 static inline bool
-StringIsEmpty(const char *string)
+StringIsEmpty(const char *string) noexcept
 {
-  return *string == 0;
+	return *string == 0;
 }
 
 gcc_pure gcc_nonnull_all

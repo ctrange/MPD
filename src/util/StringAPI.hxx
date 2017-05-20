@@ -94,6 +94,12 @@ StringFindLast(char *haystack, char needle) noexcept
 	return strrchr(haystack, needle);
 }
 
+static inline char *
+StringToken(char *str, const char *delim) noexcept
+{
+	return strtok(str, delim);
+}
+
 gcc_nonnull_all
 static inline void
 UnsafeCopyString(char *dest, const char *src) noexcept
@@ -106,11 +112,11 @@ static inline char *
 UnsafeCopyStringP(char *dest, const char *src) noexcept
 {
 #if defined(WIN32) || defined(__BIONIC__)
-  /* emulate stpcpy() */
-  UnsafeCopyString(dest, src);
-  return dest + StringLength(dest);
+	/* emulate stpcpy() */
+	UnsafeCopyString(dest, src);
+	return dest + StringLength(dest);
 #else
-  return stpcpy(dest, src);
+	return stpcpy(dest, src);
 #endif
 }
 
@@ -134,13 +140,34 @@ StringIsEqual(const char *a, const char *b, size_t length) noexcept
 	return strncmp(a, b, length) == 0;
 }
 
+gcc_pure gcc_nonnull_all
+static inline bool
+StringIsEqualIgnoreCase(const char *a, const char *b) noexcept
+{
+	return strcasecmp(a, b) == 0;
+}
+
+gcc_pure gcc_nonnull_all
+static inline bool
+StringIsEqualIgnoreCase(const char *a, const char *b, size_t size) noexcept
+{
+	return strncasecmp(a, b, size) == 0;
+}
+
+gcc_pure gcc_nonnull_all
+static inline int
+StringCollate(const char *a, const char *b) noexcept
+{
+	return strcoll(a, b);
+}
+
 /**
  * Copy the string to a new allocation.  The return value must be
  * freed with free().
  */
 gcc_malloc gcc_nonnull_all
 static inline char *
-DuplicateString(const char *p)
+DuplicateString(const char *p) noexcept
 {
 	return strdup(p);
 }

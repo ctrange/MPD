@@ -33,7 +33,7 @@ sudo apt-get install build-essential automake autoconf libtool pkg-config libcur
 
 git clone https://github.com/xxxbugxxxx/MPD cd MPD
 ./autogen.sh 
-./configure --enable-sacdiso --disable-iso9660
+./configure --enable-sacdiso --disable-iso9660 --with-systemdsystemunitdir=/lib/systemd/system
 
 make install CPPFLAGS="$(pkg-config --cflags glib-2.0)" LIBS="$(pkg-config --libs glib-2.0)"
 
@@ -69,12 +69,27 @@ Note: there are a few dependencies needed,
 expat, libupnp, glib2.0, and glib2.0 path may need to be tweaked. If there is build error, most likely it is missing lib.
 After fixing a missing lib, don't forget to do "./autogen.sh" and "./configure --enable-sacdiso --disable-iso9660"
 otherwise it won't help.
-Also, for DSD-native to work, alsa-lib has to be 1.0.29 or above. linux kernel has to be patched for your USB DAC.
+Also, for DSD-native to work, alsa-lib has to be 1.0.27 or above. linux kernel has to be patched for your USB DAC.
 details refer to https://github.com/lintweaker/xmos-native-dsd.
 use dpkg -l to find libasound2 's version and remove and build from source as needed.
+
+systemd socket activation
+
+Using systemd, you can launch MPD on demand when the first client attempts to connect.
+
+MPD comes with two systemd unit files: a "service" unit and a "socket" unit. These will only be installed when MPD was configured with --with-systemdsystemunitdir=/lib/systemd/system.
+
+To enable socket activation, type:
+
+systemctl enable mpd.socket
+systemctl start mpd.socket
+
+
 And this work is based on couple of genius's work.
-It is based on Max Kellerman's MPD 0.20.4
+It is based on Max Kellerman's MPD 0.20.8
 and Maxim V.Anisiutkin 's SACD ISO fork http://git.musicpd.org/cgit/manisiutkin/mpd.git
+
+
 
 http://www.musicpd.org
 # Music Player Daemon

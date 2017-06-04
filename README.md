@@ -33,7 +33,7 @@ sudo apt-get install build-essential automake autoconf libtool pkg-config libcur
 
 git clone https://github.com/xxxbugxxxx/MPD cd MPD
 ./autogen.sh 
-./configure --enable-sacdiso --disable-iso9660 --with-systemdsystemunitdir=/lib/systemd/system
+./configure --enable-sacdiso --disable-iso9660 --with-systemduserunitdir=/usr/lib/systemd/user
 
 make install CPPFLAGS="$(pkg-config --cflags glib-2.0)" LIBS="$(pkg-config --libs glib-2.0)"
 
@@ -77,12 +77,8 @@ systemd socket activation
 
 Using systemd, you can launch MPD on demand when the first client attempts to connect.
 
-MPD comes with two systemd unit files: a "service" unit and a "socket" unit. These will only be installed when MPD was configured with --with-systemdsystemunitdir=/lib/systemd/system.
+MPD comes with two systemd unit files: a "service" unit and a "socket" unit. These will only be installed when MPD was configured with --with-systemduserunitdir=/usr/lib/systemd/user
 
-To enable socket activation, type:
-
-systemctl enable mpd.socket
-systemctl start mpd.socket
 
 
 And this work is based on couple of genius's work.

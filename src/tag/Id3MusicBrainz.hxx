@@ -17,48 +17,9 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#include "config.h"
-#include "mixer/MixerInternal.hxx"
+#ifndef MPD_TAG_ID3MUSICBRAINZ_HXX
+#define MPD_TAG_ID3MUSICBRAINZ_HXX
 
-class NullMixer final : public Mixer {
-	/**
-	 * The current volume in percent (0..100).
-	 */
-	unsigned volume;
+extern const struct tag_table musicbrainz_txxx_tags[];
 
-public:
-	NullMixer(MixerListener &_listener)
-		:Mixer(null_mixer_plugin, _listener),
-		 volume(100)
-	{
-	}
-
-	/* virtual methods from class Mixer */
-	void Open() override {
-	}
-
-	void Close() noexcept override {
-	}
-
-	int GetVolume() override {
-		return volume;
-	}
-
-	void SetVolume(unsigned _volume) override {
-		volume = _volume;
-	}
-};
-
-static Mixer *
-null_mixer_init(gcc_unused EventLoop &event_loop,
-		gcc_unused AudioOutput &ao,
-		MixerListener &listener,
-		gcc_unused const ConfigBlock &block)
-{
-	return new NullMixer(listener);
-}
-
-const MixerPlugin null_mixer_plugin = {
-	null_mixer_init,
-	true,
-};
+#endif

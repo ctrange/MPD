@@ -17,14 +17,18 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#include "config.h"
-#include "Internal.hxx"
+#include "Id3MusicBrainz.hxx"
+#include "Table.hxx"
+#include "Type.h"
 
-bool
-AudioOutput::IsChunkConsumed(const MusicChunk &chunk) const noexcept
-{
-	if (!open)
-		return true;
-
-	return source.IsChunkConsumed(chunk);
-}
+const struct tag_table musicbrainz_txxx_tags[] = {
+	{ "ALBUMARTISTSORT", TAG_ALBUM_ARTIST_SORT },
+	{ "MusicBrainz Artist Id", TAG_MUSICBRAINZ_ARTISTID },
+	{ "MusicBrainz Album Id", TAG_MUSICBRAINZ_ALBUMID },
+	{ "MusicBrainz Album Artist Id",
+	  TAG_MUSICBRAINZ_ALBUMARTISTID },
+	{ "MusicBrainz Track Id", TAG_MUSICBRAINZ_TRACKID },
+	{ "MusicBrainz Release Track Id",
+	  TAG_MUSICBRAINZ_RELEASETRACKID },
+	{ nullptr, TAG_NUM_OF_ITEM_TYPES }
+};

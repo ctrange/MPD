@@ -107,7 +107,9 @@ public:
 	ProxyDatabase(EventLoop &_loop, DatabaseListener &_listener,
 		      const ConfigBlock &block);
 
-	static Database *Create(EventLoop &loop, DatabaseListener &listener,
+	static Database *Create(EventLoop &main_event_loop,
+				EventLoop &io_event_loop,
+				DatabaseListener &listener,
 				const ConfigBlock &block);
 
 	void Open() override;
@@ -197,7 +199,11 @@ ProxySong::ProxySong(const mpd_song *song)
 	uri = mpd_song_get_uri(song);
 	real_uri = nullptr;
 	tag = &tag2;
-	mtime = mpd_song_get_last_modified(song);
+
+	const auto _mtime = mpd_song_get_last_modified(song);
+	mtime = _mtime > 0
+		? std::chrono::system_clock::from_time_t(_mtime)
+		: std::chrono::system_clock::time_point::min();
 
 #if LIBMPDCLIENT_CHECK_VERSION(2,3,0)
 	start_time = SongTime::FromS(mpd_song_get_start(song));
@@ -341,7 +347,8 @@ ProxyDatabase::ProxyDatabase(EventLoop &_loop, DatabaseListener &_listener,
 }
 
 Database *
-ProxyDatabase::Create(EventLoop &loop, DatabaseListener &listener,
+ProxyDatabase::Create(EventLoop &loop, EventLoop &,
+		      DatabaseListener &listener,
 		      const ConfigBlock &block)
 {
 	return new ProxyDatabase(loop, listener, block);
@@ -398,7 +405,7 @@ ProxyDatabase::Connect()
 	idle_received = unsigned(-1);
 	is_idle = false;
 
-	SocketMonitor::Open(mpd_async_get_fd(mpd_connection_get_async(connection)));
+	SocketMonitor::Open(SocketDescriptor(mpd_async_get_fd(mpd_connection_get_async(connection))));
 	IdleMonitor::Schedule();
 }
 
@@ -562,10 +569,13 @@ Visit(struct mpd_connection *connection,
       VisitPlaylist visit_playlist)
 {
 	const char *path = mpd_directory_get_path(directory);
+
+	std::chrono::system_clock::time_point mtime =
+		std::chrono::system_clock::time_point::min();
 #if LIBMPDCLIENT_CHECK_VERSION(2,9,0)
-	time_t mtime = mpd_directory_get_last_modified(directory);
-#else
-	time_t mtime = 0;
+	time_t _mtime = mpd_directory_get_last_modified(directory);
+	if (_mtime > 0)
+		mtime = std::chrono::system_clock::from_time_t(_mtime);
 #endif
 
 	if (visit_directory)
@@ -603,8 +613,12 @@ Visit(const struct mpd_playlist *playlist,
 	if (!visit_playlist)
 		return;
 
+	time_t mtime = mpd_playlist_get_last_modified(playlist);
+
 	PlaylistInfo p(mpd_playlist_get_path(playlist),
-		       mpd_playlist_get_last_modified(playlist));
+		       mtime > 0
+		       ? std::chrono::system_clock::from_time_t(mtime)
+		       : std::chrono::system_clock::time_point::min());
 
 	visit_playlist(p, LightDirectory::Root());
 }

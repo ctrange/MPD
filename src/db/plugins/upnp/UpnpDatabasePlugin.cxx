@@ -63,19 +63,24 @@ public:
 		uri = uri2.c_str();
 		real_uri = real_uri2.c_str();
 		tag = &tag2;
-		mtime = 0;
+		mtime = std::chrono::system_clock::time_point::min();
 		start_time = end_time = SongTime::zero();
 	}
 };
 
 class UpnpDatabase : public Database {
+	EventLoop &event_loop;
 	UpnpClient_Handle handle;
 	UPnPDeviceDirectory *discovery;
 
 public:
-	UpnpDatabase():Database(upnp_db_plugin) {}
+	explicit UpnpDatabase(EventLoop &_event_loop)
+		:Database(upnp_db_plugin),
+		 event_loop(_event_loop) {}
 
-	static Database *Create(EventLoop &loop, DatabaseListener &listener,
+	static Database *Create(EventLoop &main_event_loop,
+				EventLoop &io_event_loop,
+				DatabaseListener &listener,
 				const ConfigBlock &block);
 
 	void Open() override;
@@ -138,11 +143,11 @@ private:
 };
 
 Database *
-UpnpDatabase::Create(gcc_unused EventLoop &loop,
+UpnpDatabase::Create(EventLoop &, EventLoop &io_event_loop,
 		     gcc_unused DatabaseListener &listener,
 		     const ConfigBlock &)
 {
-	return new UpnpDatabase();
+	return new UpnpDatabase(io_event_loop);
 }
 
 void
@@ -150,7 +155,7 @@ UpnpDatabase::Open()
 {
 	UpnpClientGlobalInit(handle);
 
-	discovery = new UPnPDeviceDirectory(handle);
+	discovery = new UPnPDeviceDirectory(event_loop, handle);
 	try {
 		discovery->Start();
 	} catch (...) {
@@ -314,7 +319,7 @@ visitSong(const UPnPDirObject &meta, const char *path,
 	song.uri = path;
 	song.real_uri = meta.url.c_str();
 	song.tag = &meta.tag;
-	song.mtime = 0;
+	song.mtime = std::chrono::system_clock::time_point::min();
 	song.start_time = song.end_time = SongTime::zero();
 
 	if (selection.Match(song))
@@ -477,7 +482,8 @@ VisitObject(const UPnPDirObject &object, const char *uri,
 
 	case UPnPDirObject::Type::CONTAINER:
 		if (visit_directory)
-			visit_directory(LightDirectory(uri, 0));
+			visit_directory(LightDirectory(uri,
+						       std::chrono::system_clock::time_point::min()));
 		break;
 
 	case UPnPDirObject::Type::ITEM:
@@ -582,7 +588,8 @@ UpnpDatabase::Visit(const DatabaseSelection &selection,
 	if (vpath.empty()) {
 		for (const auto &server : discovery->GetDirectories()) {
 			if (visit_directory) {
-				const LightDirectory d(server.getFriendlyName(), 0);
+				const LightDirectory d(server.getFriendlyName(),
+						       std::chrono::system_clock::time_point::min());
 				visit_directory(d);
 			}
 

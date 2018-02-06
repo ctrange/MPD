@@ -32,6 +32,7 @@
 #include "Global.hxx"
 #include "Version.hxx"
 #include "Handler.hxx"
+#include "event/Call.hxx"
 #include "util/RuntimeError.hxx"
 #include "util/StringStrip.hxx"
 #include "util/StringView.hxx"
@@ -44,7 +45,7 @@
 #include <assert.h>
 #include <string.h>
 
-CurlRequest::CurlRequest(CurlGlobal &_global, const char *url,
+CurlRequest::CurlRequest(CurlGlobal &_global,
 			 CurlResponseHandler &_handler)
 	:global(_global), handler(_handler),
 	 postpone_error_event(global.GetEventLoop(),
@@ -63,10 +64,9 @@ CurlRequest::CurlRequest(CurlGlobal &_global, const char *url,
 	easy.SetOption(CURLOPT_NOPROGRESS, 1l);
 	easy.SetOption(CURLOPT_NOSIGNAL, 1l);
 	easy.SetOption(CURLOPT_CONNECTTIMEOUT, 10l);
-	easy.SetOption(CURLOPT_URL, url);
 }
 
-CurlRequest::~CurlRequest()
+CurlRequest::~CurlRequest() noexcept
 {
 	FreeEasy();
 }
@@ -81,7 +81,15 @@ CurlRequest::Start()
 }
 
 void
-CurlRequest::Stop()
+CurlRequest::StartIndirect()
+{
+	BlockingCall(global.GetEventLoop(), [this](){
+			Start();
+		});
+}
+
+void
+CurlRequest::Stop() noexcept
 {
 	if (!registered)
 		return;
@@ -91,7 +99,15 @@ CurlRequest::Stop()
 }
 
 void
-CurlRequest::FreeEasy()
+CurlRequest::StopIndirect()
+{
+	BlockingCall(global.GetEventLoop(), [this](){
+			Stop();
+		});
+}
+
+void
+CurlRequest::FreeEasy() noexcept
 {
 	if (!easy)
 		return;
@@ -101,7 +117,7 @@ CurlRequest::FreeEasy()
 }
 
 void
-CurlRequest::Resume()
+CurlRequest::Resume() noexcept
 {
 	assert(registered);
 
@@ -143,7 +159,7 @@ CurlRequest::FinishBody()
 }
 
 void
-CurlRequest::Done(CURLcode result)
+CurlRequest::Done(CURLcode result) noexcept
 {
 	Stop();
 
@@ -155,13 +171,7 @@ CurlRequest::Done(CURLcode result)
 				msg = curl_easy_strerror(result);
 			throw FormatRuntimeError("CURL failed: %s", msg);
 		}
-	} catch (...) {
-		state = State::CLOSED;
-		handler.OnError(std::current_exception());
-		return;
-	}
 
-	try {
 		FinishBody();
 	} catch (...) {
 		state = State::CLOSED;
@@ -173,14 +183,14 @@ gcc_pure
 static bool
 IsResponseBoundaryHeader(StringView s) noexcept
 {
-	return s.size > 5 && (memcmp(s.data, "HTTP/", 5) == 0 ||
+	return s.size > 5 && (s.StartsWith("HTTP/") ||
 			      /* the proprietary "ICY 200 OK" is
 				 emitted by Shoutcast */
-			      memcmp(s.data, "ICY 2", 5) == 0);
+			      s.StartsWith("ICY 2"));
 }
 
 inline void
-CurlRequest::HeaderFunction(StringView s)
+CurlRequest::HeaderFunction(StringView s) noexcept
 {
 	if (state > State::HEADERS)
 		return;
@@ -216,7 +226,8 @@ CurlRequest::HeaderFunction(StringView s)
 }
 
 size_t
-CurlRequest::_HeaderFunction(void *ptr, size_t size, size_t nmemb, void *stream)
+CurlRequest::_HeaderFunction(void *ptr, size_t size, size_t nmemb,
+			     void *stream) noexcept
 {
 	CurlRequest &c = *(CurlRequest *)stream;
 
@@ -227,7 +238,7 @@ CurlRequest::_HeaderFunction(void *ptr, size_t size, size_t nmemb, void *stream)
 }
 
 inline size_t
-CurlRequest::DataReceived(const void *ptr, size_t received_size)
+CurlRequest::DataReceived(const void *ptr, size_t received_size) noexcept
 {
 	assert(received_size > 0);
 
@@ -249,7 +260,8 @@ CurlRequest::DataReceived(const void *ptr, size_t received_size)
 }
 
 size_t
-CurlRequest::WriteFunction(void *ptr, size_t size, size_t nmemb, void *stream)
+CurlRequest::WriteFunction(void *ptr, size_t size, size_t nmemb,
+			   void *stream) noexcept
 {
 	CurlRequest &c = *(CurlRequest *)stream;
 
@@ -261,7 +273,7 @@ CurlRequest::WriteFunction(void *ptr, size_t size, size_t nmemb, void *stream)
 }
 
 void
-CurlRequest::OnPostponeError()
+CurlRequest::OnPostponeError() noexcept
 {
 	assert(postponed_error);
 

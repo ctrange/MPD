@@ -31,8 +31,8 @@
 #include "ReplayGainMode.hxx"
 
 #include <exception>
-
 #include <utility>
+#include <memory>
 
 #include <assert.h>
 #include <stdint.h>
@@ -130,11 +130,8 @@ struct DecoderControl {
 	 * The song currently being decoded.  This attribute is set by
 	 * the player thread, when it sends the #DecoderCommand::START
 	 * command.
-	 *
-	 * This is a duplicate, and must be freed when this attribute
-	 * is cleared.
 	 */
-	DetachedSong *song = nullptr;
+	std::unique_ptr<DetachedSong> song;
 
 	/**
 	 * The initial seek position, e.g. to the start of a sub-track
@@ -177,20 +174,20 @@ struct DecoderControl {
 	 */
 	DecoderControl(Mutex &_mutex, Cond &_client_cond,
 		       const AudioFormat _configured_audio_format,
-		       const ReplayGainConfig &_replay_gain_config);
-	~DecoderControl();
+		       const ReplayGainConfig &_replay_gain_config) noexcept;
+	~DecoderControl() noexcept;
 
 	/**
 	 * Locks the object.
 	 */
-	void Lock() const {
+	void Lock() const noexcept {
 		mutex.lock();
 	}
 
 	/**
 	 * Unlocks the object.
 	 */
-	void Unlock() const {
+	void Unlock() const noexcept {
 		mutex.unlock();
 	}
 
@@ -199,7 +196,7 @@ struct DecoderControl {
 	 * player thread.  The object should be locked prior to
 	 * calling this function.
 	 */
-	void Signal() {
+	void Signal() noexcept {
 		cond.signal();
 	}
 
@@ -208,7 +205,7 @@ struct DecoderControl {
 	 * is only valid in the decoder thread.  The object must be locked
 	 * prior to calling this function.
 	 */
-	void Wait() {
+	void Wait() noexcept {
 		cond.wait(mutex);
 	}
 
@@ -219,9 +216,9 @@ struct DecoderControl {
 	 *
 	 * Caller must hold the lock.
 	 */
-	void WaitForDecoder();
+	void WaitForDecoder() noexcept;
 
-	bool IsIdle() const {
+	bool IsIdle() const noexcept {
 		return state == DecoderState::STOP ||
 			state == DecoderState::ERROR;
 	}
@@ -261,7 +258,7 @@ struct DecoderControl {
 	 * Caller must lock the object.
 	 */
 	void SetReady(const AudioFormat audio_format,
-		      bool _seekable, SignedSongTime _duration);
+		      bool _seekable, SignedSongTime _duration) noexcept;
 
 	/**
 	 * Checks whether an error has occurred, and if so, rethrows
@@ -286,11 +283,11 @@ struct DecoderControl {
 	}
 
 	/**
-	 * Clear the error condition and free the #Error object (if any).
+	 * Clear the error condition (if any).
 	 *
 	 * Caller must lock the object.
 	 */
-	void ClearError() {
+	void ClearError() noexcept {
 		if (state == DecoderState::ERROR) {
 			error = std::exception_ptr();
 			state = DecoderState::STOP;
@@ -307,12 +304,6 @@ struct DecoderControl {
 	gcc_pure
 	bool IsCurrentSong(const DetachedSong &_song) const noexcept;
 
-	gcc_pure
-	bool LockIsCurrentSong(const DetachedSong &_song) const noexcept {
-		const std::lock_guard<Mutex> protect(mutex);
-		return IsCurrentSong(_song);
-	}
-
 private:
 	/**
 	 * Wait for the command to be finished by the decoder thread.
@@ -320,7 +311,7 @@ private:
 	 * To be called from the client thread.  Caller must lock the
 	 * object.
 	 */
-	void WaitCommandLocked() {
+	void WaitCommandLocked() noexcept {
 		while (command != DecoderCommand::NONE)
 			WaitForDecoder();
 	}
@@ -332,7 +323,7 @@ private:
 	 * To be called from the client thread.  Caller must lock the
 	 * object.
 	 */
-	void SynchronousCommandLocked(DecoderCommand cmd) {
+	void SynchronousCommandLocked(DecoderCommand cmd) noexcept {
 		command = cmd;
 		Signal();
 		WaitCommandLocked();
@@ -345,13 +336,13 @@ private:
 	 * To be called from the client thread.  This method locks the
 	 * object.
 	 */
-	void LockSynchronousCommand(DecoderCommand cmd) {
+	void LockSynchronousCommand(DecoderCommand cmd) noexcept {
 		const std::lock_guard<Mutex> protect(mutex);
 		ClearError();
 		SynchronousCommandLocked(cmd);
 	}
 
-	void LockAsynchronousCommand(DecoderCommand cmd) {
+	void LockAsynchronousCommand(DecoderCommand cmd) noexcept {
 		const std::lock_guard<Mutex> protect(mutex);
 		command = cmd;
 		Signal();
@@ -365,7 +356,7 @@ public:
 	 * To be called from the decoder thread.  Caller must lock the
 	 * mutex.
 	 */
-	void CommandFinishedLocked() {
+	void CommandFinishedLocked() noexcept {
 		assert(command != DecoderCommand::NONE);
 
 		command = DecoderCommand::NONE;
@@ -375,6 +366,8 @@ public:
 	/**
 	 * Start the decoder.
 	 *
+	 * Caller must lock the object.
+	 *
 	 * @param song the song to be decoded; the given instance will be
 	 * owned and freed by the decoder
 	 * @param start_time see #DecoderControl
@@ -382,31 +375,37 @@ public:
 	 * @param pipe the pipe which receives the decoded chunks (owned by
 	 * the caller)
 	 */
-	void Start(DetachedSong *song, SongTime start_time, SongTime end_time,
-		   MusicBuffer &buffer, MusicPipe &pipe);
+	void Start(std::unique_ptr<DetachedSong> song,
+		   SongTime start_time, SongTime end_time,
+		   MusicBuffer &buffer, MusicPipe &pipe) noexcept;
 
-	void Stop();
+	/**
+	 * Caller must lock the object.
+	 */
+	void Stop() noexcept;
 
 	/**
 	 * Throws #std::runtime_error on error.
+	 *
+	 * Caller must lock the object.
 	 */
 	void Seek(SongTime t);
 
-	void Quit();
+	void Quit() noexcept;
 
-	const char *GetMixRampStart() const {
+	const char *GetMixRampStart() const noexcept {
 		return mix_ramp.GetStart();
 	}
 
-	const char *GetMixRampEnd() const {
+	const char *GetMixRampEnd() const noexcept {
 		return mix_ramp.GetEnd();
 	}
 
-	const char *GetMixRampPreviousEnd() const {
+	const char *GetMixRampPreviousEnd() const noexcept {
 		return previous_mix_ramp.GetEnd();
 	}
 
-	void SetMixRamp(MixRampInfo &&new_value) {
+	void SetMixRamp(MixRampInfo &&new_value) noexcept {
 		mix_ramp = std::move(new_value);
 	}
 
@@ -414,10 +413,10 @@ public:
 	 * Move mixramp_end to mixramp_prev_end and clear
 	 * mixramp_start/mixramp_end.
 	 */
-	void CycleMixRamp();
+	void CycleMixRamp() noexcept;
 
 private:
-	void RunThread();
+	void RunThread() noexcept;
 };
 
 #endif

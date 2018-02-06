@@ -41,7 +41,7 @@ public:
 		:base_fs(std::move(_base_fs)), reader(base_fs) {}
 
 	/* virtual methods from class StorageDirectoryReader */
-	const char *Read() override;
+	const char *Read() noexcept override;
 	StorageFileInfo GetInfo(bool follow) override;
 };
 
@@ -59,7 +59,7 @@ public:
 	/* virtual methods from class Storage */
 	StorageFileInfo GetInfo(const char *uri_utf8, bool follow) override;
 
-	StorageDirectoryReader *OpenDirectory(const char *uri_utf8) override;
+	std::unique_ptr<StorageDirectoryReader> OpenDirectory(const char *uri_utf8) override;
 
 	std::string MapUTF8(const char *uri_utf8) const noexcept override;
 
@@ -86,7 +86,7 @@ Stat(Path path, bool follow)
 
 	info.size = src.GetSize();
 	info.mtime = src.GetModificationTime();
-#ifdef WIN32
+#ifdef _WIN32
 	info.device = info.inode = 0;
 #else
 	info.device = src.GetDevice();
@@ -123,8 +123,8 @@ LocalStorage::MapFS(const char *uri_utf8) const noexcept
 {
 	try {
 		return MapFSOrThrow(uri_utf8);
-	} catch (const std::runtime_error &) {
-		return AllocatedPath::Null();
+	} catch (...) {
+		return nullptr;
 	}
 }
 
@@ -140,10 +140,10 @@ LocalStorage::GetInfo(const char *uri_utf8, bool follow)
 	return Stat(MapFSOrThrow(uri_utf8), follow);
 }
 
-StorageDirectoryReader *
+std::unique_ptr<StorageDirectoryReader>
 LocalStorage::OpenDirectory(const char *uri_utf8)
 {
-	return new LocalDirectoryReader(MapFSOrThrow(uri_utf8));
+	return std::make_unique<LocalDirectoryReader>(MapFSOrThrow(uri_utf8));
 }
 
 gcc_pure
@@ -156,7 +156,7 @@ SkipNameFS(PathTraitsFS::const_pointer_type name_fs) noexcept
 }
 
 const char *
-LocalDirectoryReader::Read()
+LocalDirectoryReader::Read() noexcept
 {
 	while (reader.ReadEntry()) {
 		const Path name_fs = reader.GetEntry();
@@ -179,10 +179,10 @@ LocalDirectoryReader::GetInfo(bool follow)
 	return Stat(AllocatedPath::Build(base_fs, reader.GetEntry()), follow);
 }
 
-Storage *
+std::unique_ptr<Storage>
 CreateLocalStorage(Path base_fs)
 {
-	return new LocalStorage(base_fs);
+	return std::make_unique<LocalStorage>(base_fs);
 }
 
 const StoragePlugin local_storage_plugin = {

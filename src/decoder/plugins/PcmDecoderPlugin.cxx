@@ -31,7 +31,7 @@
 #include "util/MimeType.hxx"
 #include "Log.hxx"
 
-#include <stdexcept>
+#include <exception>
 
 #include <assert.h>
 #include <string.h>
@@ -44,7 +44,7 @@ FillBuffer(DecoderClient &client, InputStream &is, B &buffer)
 {
 	buffer.Shift();
 	auto w = buffer.Write();
-	if (w.IsEmpty())
+	if (w.empty())
 		return true;
 
 	size_t nbytes = decoder_read(client, is, w.data, w.size);
@@ -105,8 +105,8 @@ pcm_stream_decode(DecoderClient &client, InputStream &is)
 
 			try {
 				CheckSampleRate(value);
-			} catch (const std::runtime_error &e) {
-				LogError(e);
+			} catch (...) {
+				LogError(std::current_exception());
 				return;
 			}
 
@@ -127,8 +127,8 @@ pcm_stream_decode(DecoderClient &client, InputStream &is)
 
 			try {
 				CheckChannelCount(value);
-			} catch (const std::runtime_error &e) {
-				LogError(e);
+			} catch (...) {
+				LogError(std::current_exception());
 				return;
 			}
 
@@ -185,7 +185,7 @@ pcm_stream_decode(DecoderClient &client, InputStream &is)
 			r.size = (r.size / 3) * 4;
 		}
 
-		cmd = !r.IsEmpty()
+		cmd = !r.empty()
 			? client.SubmitData(is, r.data, r.size, 0)
 			: client.GetCommand();
 		if (cmd == DecoderCommand::SEEK) {
@@ -196,8 +196,8 @@ pcm_stream_decode(DecoderClient &client, InputStream &is)
 				is.LockSeek(offset);
 				buffer.Clear();
 				client.CommandFinished();
-			} catch (const std::runtime_error &e) {
-				LogError(e);
+			} catch (...) {
+				LogError(std::current_exception());
 				client.SeekError();
 			}
 

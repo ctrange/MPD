@@ -29,6 +29,8 @@
 #include "util/StringCompare.hxx"
 #include "Log.hxx"
 
+#include <exception>
+
 #include <stdlib.h>
 
 #define PRIO_LABEL "Prio: "
@@ -89,15 +91,15 @@ queue_load_song(TextFile &file, const SongLoader &loader,
 			return;
 	}
 
-	DetachedSong *song;
+	std::unique_ptr<DetachedSong> song;
 
 	if ((p = StringAfterPrefix(line, SONG_BEGIN))) {
 		const char *uri = p;
 
 		try {
 			song = song_load(file, uri);
-		} catch (const std::runtime_error &e) {
-			LogError(e);
+		} catch (...) {
+			LogError(std::current_exception());
 			return;
 		}
 	} else {
@@ -111,14 +113,11 @@ queue_load_song(TextFile &file, const SongLoader &loader,
 
 		const char *uri = endptr + 1;
 
-		song = new DetachedSong(uri);
+		song = std::make_unique<DetachedSong>(uri);
 	}
 
-	if (!playlist_check_translate_song(*song, nullptr, loader)) {
-		delete song;
+	if (!playlist_check_translate_song(*song, nullptr, loader))
 		return;
-	}
 
 	queue.Append(std::move(*song), priority);
-	delete song;
 }

@@ -44,7 +44,7 @@
 #include <unistd.h>
 #include <assert.h>
 
-#ifdef WIN32
+#ifdef _WIN32
 #include <ws2tcpip.h>
 #include <winsock.h>
 #else
@@ -71,7 +71,7 @@ public:
 		:SocketMonitor(_loop),
 		 parent(_parent), serial(_serial),
 #ifdef HAVE_UN
-		 path(AllocatedPath::Null()),
+		 path(nullptr),
 #endif
 		 address(std::forward<A>(_address))
 	{
@@ -115,7 +115,7 @@ public:
 	void Accept() noexcept;
 
 private:
-	virtual bool OnSocketReady(unsigned flags) override;
+	bool OnSocketReady(unsigned flags) noexcept override;
 };
 
 static constexpr Domain server_socket_domain("server_socket");
@@ -149,7 +149,7 @@ inline void
 OneServerSocket::Accept() noexcept
 {
 	StaticSocketAddress peer_address;
-	UniqueSocketDescriptor peer_fd(Get().AcceptNonBlock(peer_address));
+	UniqueSocketDescriptor peer_fd(GetSocket().AcceptNonBlock(peer_address));
 	if (!peer_fd.IsDefined()) {
 		const SocketErrorMessage msg;
 		FormatError(server_socket_domain,
@@ -169,7 +169,7 @@ OneServerSocket::Accept() noexcept
 }
 
 bool
-OneServerSocket::OnSocketReady(gcc_unused unsigned flags)
+OneServerSocket::OnSocketReady(gcc_unused unsigned flags) noexcept
 {
 	Accept();
 	return true;
@@ -220,11 +220,11 @@ ServerSocket::Open()
 
 		try {
 			i.Open();
-		} catch (const std::runtime_error &e) {
+		} catch (...) {
 			if (good != nullptr && good->GetSerial() == i.GetSerial()) {
 				const auto address_string = i.ToString();
 				const auto good_string = good->ToString();
-				FormatError(e,
+				FormatError(std::current_exception(),
 					    "bind to '%s' failed "
 					    "(continuing anyway, because "
 					    "binding to '%s' succeeded)",

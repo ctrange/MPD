@@ -20,6 +20,7 @@
 #include "config.h"
 #include "FileOutputStream.hxx"
 #include "system/Error.hxx"
+#include "util/StringFormat.hxx"
 
 FileOutputStream::FileOutputStream(Path _path, Mode _mode)
 	:path(_path), mode(_mode)
@@ -43,7 +44,7 @@ FileOutputStream::FileOutputStream(Path _path, Mode _mode)
 	}
 }
 
-#ifdef WIN32
+#ifdef _WIN32
 
 inline void
 FileOutputStream::OpenCreate(gcc_unused bool visible)
@@ -212,10 +213,9 @@ FileOutputStream::Commit()
 		unlink(GetPath().c_str());
 
 		/* hard-link the temporary file to the final path */
-		char fd_path[64];
-		snprintf(fd_path, sizeof(fd_path), "/proc/self/fd/%d",
-			 fd.Get());
-		if (linkat(AT_FDCWD, fd_path, AT_FDCWD, path.c_str(),
+		if (linkat(AT_FDCWD,
+			   StringFormat<64>("/proc/self/fd/%d", fd.Get()),
+			   AT_FDCWD, path.c_str(),
 			   AT_SYMLINK_FOLLOW) < 0)
 			throw FormatErrno("Failed to commit %s",
 					  path.c_str());
@@ -223,7 +223,7 @@ FileOutputStream::Commit()
 #endif
 
 	if (!Close()) {
-#ifdef WIN32
+#ifdef _WIN32
 		throw FormatLastError("Failed to commit %s",
 				      path.ToUTF8().c_str());
 #else

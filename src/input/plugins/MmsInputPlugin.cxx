@@ -43,7 +43,7 @@ protected:
 	virtual void Open() override;
 	virtual size_t ThreadRead(void *ptr, size_t size) override;
 
-	void Close() override {
+	void Close() noexcept override {
 		mmsx_close(mms);
 	}
 };
@@ -51,22 +51,20 @@ protected:
 void
 MmsInputStream::Open()
 {
-	Unlock();
+	{
+		const ScopeUnlock unlock(mutex);
 
-	mms = mmsx_connect(nullptr, nullptr, GetURI(), 128 * 1024);
-	if (mms == nullptr) {
-		Lock();
-		throw std::runtime_error("mmsx_connect() failed");
+		mms = mmsx_connect(nullptr, nullptr, GetURI(), 128 * 1024);
+		if (mms == nullptr)
+			throw std::runtime_error("mmsx_connect() failed");
 	}
-
-	Lock();
 
 	/* TODO: is this correct?  at least this selects the ffmpeg
 	   decoder, which seems to work fine */
 	SetMimeType("audio/x-ms-wma");
 }
 
-static InputStream *
+static InputStreamPtr
 input_mms_open(const char *url,
 	       Mutex &mutex, Cond &cond)
 {
@@ -76,7 +74,7 @@ input_mms_open(const char *url,
 	    !StringStartsWith(url, "mmsu://"))
 		return nullptr;
 
-	auto m = new MmsInputStream(url, mutex, cond);
+	auto m = std::make_unique<MmsInputStream>(url, mutex, cond);
 	m->Start();
 	return m;
 }

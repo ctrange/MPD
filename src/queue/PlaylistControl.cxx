@@ -75,8 +75,7 @@ playlist::MoveOrderToCurrent(unsigned old_order)
 	} else {
 		/* not playing anything: move the specified song to
 		   the front */
-		queue.SwapOrders(old_order, 0);
-		return 0;
+		return queue.MoveOrderBefore(old_order, 0);
 	}
 }
 
@@ -213,8 +212,6 @@ playlist::SeekSongOrder(PlayerControl &pc, unsigned i, SongTime seek_time)
 {
 	assert(queue.IsValidOrder(i));
 
-	const DetachedSong *queued_song = GetQueuedSong();
-
 	pc.LockClearError();
 	stop_on_error = true;
 	error_count = 0;
@@ -227,16 +224,14 @@ playlist::SeekSongOrder(PlayerControl &pc, unsigned i, SongTime seek_time)
 
 		playing = true;
 		current = i;
-
-		queued_song = nullptr;
 	}
 
 	queued = -1;
 
 	try {
-		pc.LockSeek(new DetachedSong(queue.GetOrder(i)), seek_time);
+		pc.LockSeek(std::make_unique<DetachedSong>(queue.GetOrder(i)), seek_time);
 	} catch (...) {
-		UpdateQueuedSong(pc, queued_song);
+		UpdateQueuedSong(pc, nullptr);
 		throw;
 	}
 

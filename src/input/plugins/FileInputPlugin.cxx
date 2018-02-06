@@ -70,38 +70,32 @@ OpenFileInputStream(Path path,
 		      POSIX_FADV_SEQUENTIAL);
 #endif
 
-	return InputStreamPtr(new FileInputStream(path.ToUTF8().c_str(),
-						  std::move(reader), info.GetSize(),
-						  mutex, cond));
-}
-
-static InputStream *
-input_file_open(gcc_unused const char *filename,
-		gcc_unused Mutex &mutex, gcc_unused Cond &cond)
-{
-	/* dummy method; use OpenFileInputStream() instead */
-
-	return nullptr;
+	return std::make_unique<FileInputStream>(path.ToUTF8().c_str(),
+						 std::move(reader), info.GetSize(),
+						 mutex, cond);
 }
 
 void
 FileInputStream::Seek(offset_type new_offset)
 {
-	reader.Seek((off_t)new_offset);
+	{
+		const ScopeUnlock unlock(mutex);
+		reader.Seek((off_t)new_offset);
+	}
+
 	offset = new_offset;
 }
 
 size_t
 FileInputStream::Read(void *ptr, size_t read_size)
 {
-	size_t nbytes = reader.Read(ptr, read_size);
+	size_t nbytes;
+
+	{
+		const ScopeUnlock unlock(mutex);
+		nbytes = reader.Read(ptr, read_size);
+	}
+
 	offset += nbytes;
 	return nbytes;
 }
-
-const InputPlugin input_plugin_file = {
-	"file",
-	nullptr,
-	nullptr,
-	input_file_open,
-};

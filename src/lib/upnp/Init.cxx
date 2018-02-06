@@ -22,9 +22,9 @@
 #include "thread/Mutex.hxx"
 #include "util/RuntimeError.hxx"
 
-#include <upnp/upnp.h>
-#include <upnp/upnptools.h>
-#include <upnp/ixml.h>
+#include <upnp.h>
+#include <upnptools.h>
+#include <ixml.h>
 
 #include <assert.h>
 
@@ -34,7 +34,11 @@ static unsigned upnp_ref;
 static void
 DoInit()
 {
-	auto code = UpnpInit(0, 0);
+#ifdef UPNP_ENABLE_IPV6
+	auto code = UpnpInit2(nullptr, 0);
+#else
+	auto code = UpnpInit(nullptr, 0);
+#endif
 	if (code != UPNP_E_SUCCESS)
 		throw FormatRuntimeError("UpnpInit() failed: %s",
 					 UpnpGetErrorMessage(code));
@@ -57,7 +61,7 @@ UpnpGlobalInit()
 }
 
 void
-UpnpGlobalFinish()
+UpnpGlobalFinish() noexcept
 {
 	const std::lock_guard<Mutex> protect(upnp_init_mutex);
 

@@ -211,7 +211,7 @@ MPDOpusDecoder::HandleTags(const ogg_packet &packet)
 	if (ScanOpusTags(packet.packet, packet.bytes,
 			 &rgi,
 			 add_tag_handler, &tag_builder) &&
-	    !tag_builder.IsEmpty()) {
+	    !tag_builder.empty()) {
 		client.SubmitReplayGain(&rgi);
 
 		Tag tag = tag_builder.Commit();
@@ -261,7 +261,7 @@ MPDOpusDecoder::Seek(uint64_t where_frame)
 	try {
 		SeekGranulePos(where_granulepos);
 		return true;
-	} catch (const std::runtime_error &) {
+	} catch (...) {
 		return false;
 	}
 }
@@ -277,7 +277,7 @@ mpd_opus_stream_decode(DecoderClient &client,
 	   moved it */
 	try {
 		input_stream.LockRewind();
-	} catch (const std::runtime_error &) {
+	} catch (...) {
 	}
 
 	DecoderReader reader(client, input_stream);
@@ -341,7 +341,7 @@ VisitOpusDuration(InputStream &is, OggSyncState &sync, OggStreamState &stream,
 
 static bool
 mpd_opus_scan_stream(InputStream &is,
-		     const TagHandler &handler, void *handler_ctx)
+		     const TagHandler &handler, void *handler_ctx) noexcept
 {
 	InputStreamReader reader(is);
 	OggSyncState oy(reader);

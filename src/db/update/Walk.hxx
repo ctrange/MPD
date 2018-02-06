@@ -24,6 +24,8 @@
 #include "Editor.hxx"
 #include "Compiler.h"
 
+#include <atomic>
+
 struct StorageFileInfo;
 struct Directory;
 struct ArchivePlugin;
@@ -36,7 +38,7 @@ class UpdateWalk final {
 	friend class UpdateArchiveVisitor;
 #endif
 
-#ifndef WIN32
+#ifndef _WIN32
 	static constexpr bool DEFAULT_FOLLOW_INSIDE_SYMLINKS = true;
 	static constexpr bool DEFAULT_FOLLOW_OUTSIDE_SYMLINKS = true;
 
@@ -52,7 +54,7 @@ class UpdateWalk final {
 	 * cancel as quickly as possible.  Access to this flag is
 	 * unprotected.
 	 */
-	volatile bool cancel;
+	std::atomic_bool cancel;
 
 	Storage &storage;
 
@@ -60,20 +62,20 @@ class UpdateWalk final {
 
 public:
 	UpdateWalk(EventLoop &_loop, DatabaseListener &_listener,
-		   Storage &_storage);
+		   Storage &_storage) noexcept;
 
 	/**
 	 * Cancel the current update and quit the Walk() method as
 	 * soon as possible.
 	 */
-	void Cancel() {
+	void Cancel() noexcept {
 		cancel = true;
 	}
 
 	/**
 	 * Returns true if the database was modified.
 	 */
-	bool Walk(Directory &root, const char *path, bool discard);
+	bool Walk(Directory &root, const char *path, bool discard) noexcept;
 
 private:
 	gcc_pure
@@ -81,60 +83,60 @@ private:
 			 const char *utf8_name) const noexcept;
 
 	void RemoveExcludedFromDirectory(Directory &directory,
-					 const ExcludeList &exclude_list);
+					 const ExcludeList &exclude_list) noexcept;
 
-	void PurgeDeletedFromDirectory(Directory &directory);
+	void PurgeDeletedFromDirectory(Directory &directory) noexcept;
 
 	void UpdateSongFile2(Directory &directory,
 			     const char *name, const char *suffix,
-			     const StorageFileInfo &info);
+			     const StorageFileInfo &info) noexcept;
 
 	bool UpdateSongFile(Directory &directory,
 			    const char *name, const char *suffix,
-			    const StorageFileInfo &info);
+			    const StorageFileInfo &info) noexcept;
 
 	bool UpdateContainerFile(Directory &directory,
 				 const char *name, const char *suffix,
-				 const StorageFileInfo &info);
+				 const StorageFileInfo &info) noexcept;
 
 
 #ifdef ENABLE_ARCHIVE
 	void UpdateArchiveTree(ArchiveFile &archive, Directory &parent,
-			       const char *name);
+			       const char *name) noexcept;
 
 	bool UpdateArchiveFile(Directory &directory,
 			       const char *name, const char *suffix,
-			       const StorageFileInfo &info);
+			       const StorageFileInfo &info) noexcept;
 
 	void UpdateArchiveFile(Directory &directory, const char *name,
 			       const StorageFileInfo &info,
-			       const ArchivePlugin &plugin);
+			       const ArchivePlugin &plugin) noexcept;
 
 
 #else
 	bool UpdateArchiveFile(gcc_unused Directory &directory,
 			       gcc_unused const char *name,
 			       gcc_unused const char *suffix,
-			       gcc_unused const StorageFileInfo &info) {
+			       gcc_unused const StorageFileInfo &info) noexcept {
 		return false;
 	}
 #endif
 
 	bool UpdatePlaylistFile(Directory &directory,
 				const char *name, const char *suffix,
-				const StorageFileInfo &info);
+				const StorageFileInfo &info) noexcept;
 
 	bool UpdateRegularFile(Directory &directory,
-			       const char *name, const StorageFileInfo &info);
+			       const char *name, const StorageFileInfo &info) noexcept;
 
 	void UpdateDirectoryChild(Directory &directory,
 				  const ExcludeList &exclude_list,
 				  const char *name,
-				  const StorageFileInfo &info);
+				  const StorageFileInfo &info) noexcept;
 
 	bool UpdateDirectory(Directory &directory,
 			     const ExcludeList &exclude_list,
-			     const StorageFileInfo &info);
+			     const StorageFileInfo &info) noexcept;
 
 	/**
 	 * Create the specified directory object if it does not exist
@@ -145,16 +147,16 @@ private:
 	 * The caller must lock the database.
 	 */
 	Directory *MakeDirectoryIfModified(Directory &parent, const char *name,
-					   const StorageFileInfo &info);
+					   const StorageFileInfo &info) noexcept;
 
 	Directory *DirectoryMakeChildChecked(Directory &parent,
 					     const char *uri_utf8,
-					     const char *name_utf8);
+					     const char *name_utf8) noexcept;
 
 	Directory *DirectoryMakeUriParentChecked(Directory &root,
-						 const char *uri);
+						 const char *uri) noexcept;
 
-	void UpdateUri(Directory &root, const char *uri);
+	void UpdateUri(Directory &root, const char *uri) noexcept;
 };
 
 #endif

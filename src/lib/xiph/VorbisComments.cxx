@@ -23,13 +23,14 @@
 #include "tag/Table.hxx"
 #include "tag/Handler.hxx"
 #include "tag/Builder.hxx"
+#include "tag/Tag.hxx"
 #include "tag/VorbisComment.hxx"
 #include "tag/ReplayGain.hxx"
 #include "ReplayGainInfo.hxx"
 #include "util/DivideString.hxx"
 
 bool
-vorbis_comments_to_replay_gain(ReplayGainInfo &rgi, char **comments)
+vorbis_comments_to_replay_gain(ReplayGainInfo &rgi, char **comments) noexcept
 {
 	rgi.Clear();
 
@@ -71,7 +72,7 @@ vorbis_scan_comment(const char *comment,
 {
 	if (handler.pair != nullptr) {
 		const DivideString split(comment, '=');
-		if (split.IsDefined() && !split.IsEmpty())
+		if (split.IsDefined() && !split.empty())
 			tag_handler_invoke_pair(handler, handler_ctx,
 						split.GetFirst(),
 						split.GetSecond());
@@ -99,12 +100,12 @@ vorbis_comments_scan(char **comments,
 
 }
 
-Tag *
-vorbis_comments_to_tag(char **comments)
+std::unique_ptr<Tag>
+vorbis_comments_to_tag(char **comments) noexcept
 {
 	TagBuilder tag_builder;
 	vorbis_comments_scan(comments, add_tag_handler, &tag_builder);
-	return tag_builder.IsEmpty()
+	return tag_builder.empty()
 		? nullptr
 		: tag_builder.CommitNew();
 }

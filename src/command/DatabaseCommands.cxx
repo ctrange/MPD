@@ -55,6 +55,19 @@ handle_lsinfo2(Client &client, const char *uri, Response &r)
 	return CommandResult::OK;
 }
 
+static TagType
+ParseSortTag(const char *s)
+{
+	if (StringIsEqualIgnoreCase(s, "Last-Modified"))
+		return TagType(SORT_TAG_LAST_MODIFIED);
+
+	TagType tag = tag_name_parse_i(s);
+	if (tag == TAG_NUM_OF_ITEM_TYPES)
+		throw ProtocolError(ACK_ERROR_ARG, "Unknown sort tag");
+
+	return tag;
+}
+
 static CommandResult
 handle_match(Client &client, Request args, Response &r, bool fold_case)
 {
@@ -68,10 +81,15 @@ handle_match(Client &client, Request args, Response &r, bool fold_case)
 		window.SetAll();
 
 	TagType sort = TAG_NUM_OF_ITEM_TYPES;
+	bool descending = false;
 	if (args.size >= 2 && StringIsEqual(args[args.size - 2], "sort")) {
-		sort = tag_name_parse_i(args.back());
-		if (sort == TAG_NUM_OF_ITEM_TYPES)
-			throw ProtocolError(ACK_ERROR_ARG, "Unknown sort tag");
+		const char *s = args.back();
+		if (*s == '-') {
+			descending = true;
+			++s;
+		}
+
+		sort = ParseSortTag(s);
 
 		args.pop_back();
 		args.pop_back();
@@ -87,7 +105,7 @@ handle_match(Client &client, Request args, Response &r, bool fold_case)
 
 	db_selection_print(r, client.GetPartition(),
 			   selection, true, false,
-			   sort,
+			   sort, descending,
 			   window.start, window.end);
 	return CommandResult::OK;
 }
@@ -169,7 +187,7 @@ handle_count(Client &client, Request args, Response &r)
 	}
 
 	SongFilter filter;
-	if (!args.IsEmpty() && !filter.Parse(args, false)) {
+	if (!args.empty() && !filter.Parse(args, false)) {
 		r.Error(ACK_ERROR_ARG, "incorrect arguments");
 		return CommandResult::ERROR;
 	}
@@ -235,7 +253,7 @@ handle_list(Client &client, Request args, Response &r)
 		args.pop_back();
 	}
 
-	if (!args.IsEmpty()) {
+	if (!args.empty()) {
 		filter.reset(new SongFilter());
 		if (!filter->Parse(args, false)) {
 			r.Error(ACK_ERROR_ARG, "not able to parse args");

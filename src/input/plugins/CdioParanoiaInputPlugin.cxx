@@ -175,14 +175,14 @@ cdio_detect_device(void)
 	char **devices = cdio_get_devices_with_cap(nullptr, CDIO_FS_AUDIO,
 						   false);
 	if (devices == nullptr)
-		return AllocatedPath::Null();
+		return nullptr;
 
 	AllocatedPath path = AllocatedPath::FromFS(devices[0]);
 	cdio_free_device_list(devices);
 	return path;
 }
 
-static InputStream *
+static InputStreamPtr
 input_cdio_open(const char *uri,
 		Mutex &mutex, Cond &cond)
 {
@@ -250,9 +250,10 @@ input_cdio_open(const char *uri,
 		lsn_to = cdio_get_disc_last_lsn(cdio);
 	}
 
-	return new CdioParanoiaInputStream(uri, mutex, cond,
-					   drv, cdio, reverse_endian,
-					   lsn_from, lsn_to);
+	return std::make_unique<CdioParanoiaInputStream>(uri, mutex, cond,
+							 drv, cdio,
+							 reverse_endian,
+							 lsn_from, lsn_to);
 }
 
 void
@@ -270,7 +271,10 @@ CdioParanoiaInputStream::Seek(offset_type new_offset)
 	lsn_relofs = new_offset / CDIO_CD_FRAMESIZE_RAW;
 	offset = new_offset;
 
-	cdio_paranoia_seek(para, lsn_from + lsn_relofs, SEEK_SET);
+	{
+		const ScopeUnlock unlock(mutex);
+		cdio_paranoia_seek(para, lsn_from + lsn_relofs, SEEK_SET);
+	}
 }
 
 size_t
@@ -292,6 +296,8 @@ CdioParanoiaInputStream::Read(void *ptr, size_t length)
 
 		//current sector was changed ?
 		if (lsn_relofs != buffer_lsn) {
+			const ScopeUnlock unlock(mutex);
+
 			rbuf = cdio_paranoia_read(para, nullptr);
 
 			s_err = cdda_errors(drv);

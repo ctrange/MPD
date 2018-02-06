@@ -24,12 +24,12 @@
 
 #include <assert.h>
 
-PcmDsd::PcmDsd()
+PcmDsd::PcmDsd() noexcept
 {
 	dsd2pcm.fill(nullptr);
 }
 
-PcmDsd::~PcmDsd()
+PcmDsd::~PcmDsd() noexcept
 {
 	for (auto i : dsd2pcm)
 		if (i != nullptr)
@@ -37,7 +37,7 @@ PcmDsd::~PcmDsd()
 }
 
 void
-PcmDsd::Reset()
+PcmDsd::Reset() noexcept
 {
 	for (auto i : dsd2pcm)
 		if (i != nullptr)
@@ -45,10 +45,10 @@ PcmDsd::Reset()
 }
 
 ConstBuffer<float>
-PcmDsd::ToFloat(unsigned channels, ConstBuffer<uint8_t> src)
+PcmDsd::ToFloat(unsigned channels, ConstBuffer<uint8_t> src) noexcept
 {
 	assert(!src.IsNull());
-	assert(!src.IsEmpty());
+	assert(!src.empty());
 	assert(src.size % channels == 0);
 	assert(channels <= dsd2pcm.max_size());
 

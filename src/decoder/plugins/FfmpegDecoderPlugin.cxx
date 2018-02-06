@@ -103,7 +103,7 @@ ffmpeg_init(const ConfigBlock &block)
 }
 
 static void
-ffmpeg_finish()
+ffmpeg_finish() noexcept
 {
 	av_dict_free(&avformat_options);
 }
@@ -258,7 +258,7 @@ FfmpegSendFrame(DecoderClient &client, InputStream &is,
 	try {
 		output_buffer = copy_interleave_frame(codec_context, frame,
 						      buffer);
-	} catch (const std::exception e) {
+	} catch (const std::exception &e) {
 		/* this must be a serious error, e.g. OOM */
 		LogError(e);
 		return DecoderCommand::STOP;
@@ -483,7 +483,7 @@ ffmpeg_probe(DecoderClient *client, InputStream &is)
 
 	try {
 		is.LockRewind();
-	} catch (const std::runtime_error &) {
+	} catch (...) {
 		return nullptr;
 	}
 
@@ -617,7 +617,7 @@ FfmpegCheckTag(DecoderClient &client, InputStream &is,
 
 	TagBuilder tag;
 	FfmpegScanTag(format_context, audio_stream, tag);
-	if (!tag.IsEmpty())
+	if (!tag.empty())
 		client.SubmitTag(is, tag.Commit());
 }
 
@@ -814,8 +814,8 @@ ffmpeg_decode(DecoderClient &client, InputStream &input)
 	try {
 		format_context =FfmpegOpenInput(stream.io, input.GetURI(),
 						input_format);
-	} catch (const std::runtime_error &e) {
-		LogError(e);
+	} catch (...) {
+		LogError(std::current_exception());
 		return;
 	}
 
@@ -856,7 +856,7 @@ FfmpegScanStream(AVFormatContext &format_context,
 
 static bool
 ffmpeg_scan_stream(InputStream &is,
-		   const TagHandler &handler, void *handler_ctx)
+		   const TagHandler &handler, void *handler_ctx) noexcept
 {
 	AVInputFormat *input_format = ffmpeg_probe(nullptr, is);
 	if (input_format == nullptr)
@@ -869,7 +869,7 @@ ffmpeg_scan_stream(InputStream &is,
 	AVFormatContext *f;
 	try {
 		f = FfmpegOpenInput(stream.io, is.GetURI(), input_format);
-	} catch (const std::runtime_error &) {
+	} catch (...) {
 		return false;
 	}
 

@@ -129,7 +129,7 @@ VorbisDecoder::Seek(uint64_t where_frame)
 		SeekGranulePos(where_granulepos);
 		vorbis_synthesis_restart(&dsp);
 		return true;
-	} catch (const std::runtime_error &) {
+	} catch (...) {
 		return false;
 	}
 }
@@ -152,12 +152,11 @@ static void
 vorbis_send_comments(DecoderClient &client, InputStream &is,
 		     char **comments)
 {
-	Tag *tag = vorbis_comments_to_tag(comments);
+	auto tag = vorbis_comments_to_tag(comments);
 	if (!tag)
 		return;
 
 	client.SubmitTag(is, std::move(*tag));
-	delete tag;
 }
 
 void
@@ -178,6 +177,20 @@ VorbisDecoder::SubmitInit()
 	client.Ready(audio_format, eos_granulepos > 0, duration);
 }
 
+#ifdef HAVE_TREMOR
+static inline int16_t tremor_clip_sample(int32_t x)
+{
+	x >>= 9;
+
+	if (x < INT16_MIN)
+		return INT16_MIN;
+	if (x > INT16_MAX)
+		return INT16_MAX;
+
+	return x;
+}
+#endif
+
 bool
 VorbisDecoder::SubmitSomePcm()
 {
@@ -197,7 +210,7 @@ VorbisDecoder::SubmitSomePcm()
 		auto *dest = &buffer[c];
 
 		for (size_t i = 0; i < n_frames; ++i) {
-			*dest = *src++;
+			*dest = tremor_clip_sample(*src++);
 			dest += channels;
 		}
 	}
@@ -309,7 +322,7 @@ vorbis_stream_decode(DecoderClient &client,
 	   moved it */
 	try {
 		input_stream.LockRewind();
-	} catch (const std::runtime_error &) {
+	} catch (...) {
 	}
 
 	DecoderReader reader(client, input_stream);
@@ -350,7 +363,7 @@ VisitVorbisDuration(InputStream &is,
 
 static bool
 vorbis_scan_stream(InputStream &is,
-		   const TagHandler &handler, void *handler_ctx)
+		   const TagHandler &handler, void *handler_ctx) noexcept
 {
 	/* initialize libogg */
 

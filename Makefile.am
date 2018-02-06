@@ -27,7 +27,9 @@ noinst_LIBRARIES = \
 	libfs.a \
 	libplaylist_plugins.a \
 	libdecoder.a \
+	libfilter_api.a \
 	libfilter_plugins.a \
+	libfilter_glue.a \
 	libmixer_plugins.a \
 	liboutput_plugins.a
 
@@ -61,8 +63,8 @@ src_mpd_LDADD = \
 	libnet.a \
 	$(FS_LIBS) \
 	libsystem.a \
-	libutil.a \
 	$(ICU_LDADD) \
+	libutil.a \
 	$(SYSTEMD_DAEMON_LIBS)
 
 src_mpd_SOURCES = \
@@ -74,7 +76,6 @@ libmpd_a_SOURCES = \
 	src/check.h \
 	src/Compiler.h \
 	src/open.h \
-	src/poison.h \
 	src/notify.cxx src/notify.hxx \
 	src/protocol/Ack.cxx src/protocol/Ack.hxx \
 	src/protocol/ArgParser.cxx src/protocol/ArgParser.hxx \
@@ -104,11 +105,7 @@ libmpd_a_SOURCES = \
 	src/decoder/DecoderPlugin.hxx \
 	src/decoder/Bridge.cxx src/decoder/Bridge.hxx \
 	src/decoder/DecoderPrint.cxx src/decoder/DecoderPrint.hxx \
-	src/filter/FilterConfig.cxx src/filter/FilterConfig.hxx \
-	src/filter/FilterPlugin.cxx src/filter/FilterPlugin.hxx \
-	src/filter/FilterInternal.hxx \
-	src/filter/FilterRegistry.cxx src/filter/FilterRegistry.hxx \
-	src/filter/Observer.cxx src/filter/Observer.hxx \
+	src/client/Listener.cxx src/client/Listener.hxx \
 	src/client/Client.cxx src/client/Client.hxx \
 	src/client/ClientInternal.hxx \
 	src/client/ClientEvent.cxx \
@@ -143,6 +140,7 @@ libmpd_a_SOURCES = \
 	src/player/Thread.cxx src/player/Thread.hxx \
 	src/player/Control.cxx src/player/Control.hxx \
 	src/player/Listener.hxx \
+	src/player/Outputs.hxx \
 	src/PlaylistError.cxx src/PlaylistError.hxx \
 	src/PlaylistPrint.cxx src/PlaylistPrint.hxx \
 	src/PlaylistSave.cxx src/PlaylistSave.hxx \
@@ -184,6 +182,12 @@ libmpd_a_SOURCES = \
 	src/Chrono.hxx \
 	src/SongFilter.cxx src/SongFilter.hxx \
 	src/PlaylistFile.cxx src/PlaylistFile.hxx
+
+if ENABLE_CURL
+libmpd_a_SOURCES += \
+	src/RemoteTagCache.cxx src/RemoteTagCache.hxx \
+	src/RemoteTagCacheHandler.hxx
+endif
 
 if ANDROID
 else
@@ -235,16 +239,26 @@ libmpd_a_SOURCES += \
 endif
 
 CURL_SOURCES = \
+	src/lib/curl/Delegate.cxx src/lib/curl/Delegate.hxx \
+	src/lib/curl/Parser.hxx \
 	src/lib/curl/Version.cxx src/lib/curl/Version.hxx \
 	src/lib/curl/Init.cxx src/lib/curl/Init.hxx \
 	src/lib/curl/Global.cxx src/lib/curl/Global.hxx \
 	src/lib/curl/Request.cxx src/lib/curl/Request.hxx \
+	src/lib/curl/Form.cxx src/lib/curl/Form.hxx \
 	src/lib/curl/Handler.hxx \
 	src/lib/curl/Easy.hxx \
 	src/lib/curl/Multi.hxx \
 	src/lib/curl/Slist.hxx
 
+YAJL_SOURCES = \
+	src/lib/yajl/ResponseParser.cxx src/lib/yajl/ResponseParser.hxx \
+	src/lib/yajl/ParseInputStream.cxx src/lib/yajl/ParseInputStream.hxx \
+	src/lib/yajl/Callbacks.hxx \
+	src/lib/yajl/Handle.hxx
+
 UPNP_SOURCES = \
+	src/lib/upnp/Compat.hxx \
 	src/lib/upnp/Init.cxx src/lib/upnp/Init.hxx \
 	src/lib/upnp/ClientInit.cxx src/lib/upnp/ClientInit.hxx \
 	src/lib/upnp/Device.cxx src/lib/upnp/Device.hxx \
@@ -258,6 +272,10 @@ UPNP_SOURCES = \
 
 ALSA_SOURCES = \
 	src/lib/alsa/Version.cxx src/lib/alsa/Version.hxx \
+	src/lib/alsa/AllowedFormat.cxx src/lib/alsa/AllowedFormat.hxx \
+	src/lib/alsa/HwSetup.cxx src/lib/alsa/HwSetup.hxx \
+	src/lib/alsa/Format.hxx \
+	src/lib/alsa/PeriodBuffer.hxx \
 	src/lib/alsa/NonBlock.cxx src/lib/alsa/NonBlock.hxx
 
 #
@@ -289,30 +307,62 @@ libmain_a_CPPFLAGS = $(AM_CPPFLAGS) -Iandroid/build/include
 
 src_mpd_LDADD += libandroid.a libjava.a
 
-all-local: android/build/bin/$(APK_NAME)-debug.apk
+all-local: android/build/$(APK_NAME)-debug.apk
 clean-local:
 	rm -rf android/build
 
 libmpd.so: $(filter %.a,$(src_mpd_LDADD)) libmain.a
 	$(AM_V_CXXLD)$(CXXLD) -shared -Wl,--no-undefined,-shared,-Bsymbolic -llog -lz -o $@ $(AM_CXXFLAGS) $(CXXFLAGS) $(LDFLAGS) src/libmain_a-Main.o $(src_mpd_LDADD) $(LIBS)
 
-android/build/build.xml: android/AndroidManifest.xml
-	rm -rf android/build
-	mkdir -p android/build/include android/build/res android/build/src/org
-	ln -s $(abs_srcdir)/android/AndroidManifest.xml $(abs_srcdir)/android/custom_rules.xml android/build
-	ln -s $(abs_srcdir)/android/src android/build/src/org/musicpd
-	ln -s $(abs_srcdir)/android/res/values $(abs_srcdir)/android/res/layout android/build/res
-	$(ANDROID_SDK)/tools/android update project --path android/build --target android-17 --name $(APK_NAME)
+ANDROID_SDK_BUILD_TOOLS_VERSION = 27.0.0
+ANDROID_SDK_PLATFORM = android-17
 
-android/build/bin/classes/org/musicpd/Bridge.class: android/src/Bridge.java android/build/build.xml android/build/res/drawable/icon.png
-	cd android/build && ant compile-jni-classes
+ANDROID_BUILD_TOOLS_DIR = $(ANDROID_SDK)/build-tools/$(ANDROID_SDK_BUILD_TOOLS_VERSION)
+ANDROID_SDK_PLATFORM_DIR = $(ANDROID_SDK)/platforms/$(ANDROID_SDK_PLATFORM)
 
-android/build/include/org_musicpd_Bridge.h: android/build/bin/classes/org/musicpd/Bridge.class
-	javah -classpath $(ANDROID_SDK)/platforms/android-17/android.jar:android/build/bin/classes -d $(@D) org.musicpd.Bridge
+JAVAC = javac
+AAPT = $(ANDROID_BUILD_TOOLS_DIR)/aapt
+DX = $(ANDROID_BUILD_TOOLS_DIR)/dx
+ZIPALIGN = $(ANDROID_BUILD_TOOLS_DIR)/zipalign
+
+ANDROID_XML_RES := $(wildcard $(srcdir)/android/res/*/*.xml)
+ANDROID_XML_RES_COPIES := $(patsubst $(srcdir)/android/%,android/build/%,$(ANDROID_XML_RES))
+
+JAVA_SOURCE_NAMES = Bridge.java Loader.java Main.java
+JAVA_SOURCE_PATHS = $(addprefix $(srcdir)/android/src/,$(JAVA_SOURCE_NAMES))
+
+JAVA_CLASSFILES_DIR = android/build/classes
+
+$(ANDROID_XML_RES_COPIES): $(ANDROID_XML_RES)
+	@$(MKDIR_P) $(dir $@)
+	cp $(patsubst android/build/%,$(srcdir)/android/%,$@) $@
+
+android/build/resources.apk: $(ANDROID_XML_RES_COPIES) android/build/res/drawable/icon.png
+	@$(MKDIR_P) android/build/gen
+	$(AAPT) package -f -m --auto-add-overlay \
+		--custom-package org.musicpd \
+		-M $(srcdir)/android/AndroidManifest.xml \
+		-S android/build/res \
+		-J android/build/gen \
+		-I $(ANDROID_SDK_PLATFORM_DIR)/android.jar \
+		-F android/build/resources.apk
+
+# R.java is generated by aapt, when resources.apk is generated
+android/build/gen/org/musicpd/R.java: android/build/resources.apk
+
+android/build/classes.dex: $(JAVA_SOURCE_PATHS) android/build/gen/org/musicpd/R.java
+	@$(MKDIR_P) $(JAVA_CLASSFILES_DIR)
+	$(JAVAC) -source 1.5 -target 1.5 -Xlint:-options \
+		-cp $(ANDROID_SDK_PLATFORM_DIR)/android.jar:$(JAVA_CLASSFILES_DIR) \
+		-d $(JAVA_CLASSFILES_DIR) $^
+	$(DX) --dex --output $@ $(JAVA_CLASSFILES_DIR)
+
+android/build/include/org_musicpd_Bridge.h: android/build/classes.dex
+	javah -classpath $(ANDROID_SDK_PLATFORM_DIR)/android.jar:$(JAVA_CLASSFILES_DIR) -d $(@D) org.musicpd.Bridge
 
 BUILT_SOURCES = android/build/include/org_musicpd_Bridge.h
 
-android/build/libs/armeabi-v7a/libmpd.so: libmpd.so android/build/build.xml
+android/build/lib/armeabi-v7a/libmpd.so: libmpd.so
 	mkdir -p $(@D)
 	rm -f $@
 	$(STRIP) -o $@ $<
@@ -321,24 +371,19 @@ android/build/res/drawable/icon.png: mpd.svg
 	mkdir -p $(@D)
 	rsvg-convert --width=48 --height=48 $< -o $@
 
-APK_DEPS = android/build/res/drawable/icon.png \
-	android/build/libs/armeabi-v7a/libmpd.so \
-	$(wildcard $(srcdir)/android/src/*.java) \
-	android/build/build.xml
+.DELETE_ON_ERROR: android/build/unsigned.apk
+android/build/unsigned.apk: android/build/classes.dex android/build/resources.apk android/build/lib/armeabi-v7a/libmpd.so
+	cp android/build/resources.apk $@
+	cd $(dir $@) && zip -q -r $(notdir $@) classes.dex lib
 
-android/build/bin/$(APK_NAME)-debug.apk: $(APK_DEPS)
-	cd android/build && ant nodeps debug
+android/build/$(APK_NAME)-debug.apk: android/build/unsigned.apk
+	jarsigner -keystore $(HOME)/.android/debug.keystore -storepass android -signedjar $@ $< androiddebugkey
 
-android/build/bin/$(APK_NAME)-release-unsigned.apk: $(APK_DEPS)
-	cd android/build && ant nodeps release
-
-android/build/bin/$(APK_NAME)-release-unaligned.apk: android/build/bin/$(APK_NAME)-release-unsigned.apk
+android/build/$(APK_NAME)-release-unaligned.apk: android/build/unsigned.apk
 	jarsigner -digestalg SHA1 -sigalg MD5withRSA -storepass:env ANDROID_KEYSTORE_PASS -keystore $(ANDROID_KEYSTORE) -signedjar $@ $< $(ANDROID_KEY_ALIAS)
 
-ANDROID_SDK_BUILD_TOOLS_VERSION = 20.0.0
-
-android/build/bin/$(APK_NAME).apk: android/build/bin/$(APK_NAME)-release-unaligned.apk
-	$(ANDROID_SDK)/build-tools/$(ANDROID_SDK_BUILD_TOOLS_VERSION)/zipalign -f 4 $< $@
+android/build/$(APK_NAME).apk: android/build/$(APK_NAME)-release-unaligned.apk
+	$(ZIPALIGN) -f 4 $< $@
 
 endif
 
@@ -423,6 +468,7 @@ libutil_a_SOURCES = \
 	src/util/NumberParser.hxx \
 	src/util/MimeType.cxx src/util/MimeType.hxx \
 	src/util/StringBuffer.hxx \
+	src/util/StringFormat.hxx \
 	src/util/StringPointer.hxx \
 	src/util/StringView.cxx src/util/StringView.hxx \
 	src/util/WStringView.hxx \
@@ -445,7 +491,6 @@ libutil_a_SOURCES = \
 	src/util/TimeParser.cxx src/util/TimeParser.hxx \
 	src/util/UriUtil.cxx src/util/UriUtil.hxx \
 	src/util/Manual.hxx \
-	src/util/RefCount.hxx \
 	src/util/StaticFifoBuffer.hxx \
 	src/util/ForeignFifoBuffer.hxx \
 	src/util/DynamicFifoBuffer.hxx \
@@ -465,6 +510,7 @@ libutil_a_SOURCES = \
 # Multi-threading library
 
 libthread_a_SOURCES = \
+	src/thread/SafeSingleton.hxx \
 	src/thread/Util.cxx src/thread/Util.hxx \
 	src/thread/Name.hxx \
 	src/thread/Slack.hxx \
@@ -519,8 +565,7 @@ libevent_a_SOURCES = \
 	src/event/SignalMonitor.hxx src/event/SignalMonitor.cxx \
 	src/event/TimerEvent.hxx src/event/TimerEvent.cxx \
 	src/event/IdleMonitor.hxx src/event/IdleMonitor.cxx \
-	src/event/DeferredMonitor.hxx src/event/DeferredMonitor.cxx \
-	src/event/DeferEvent.hxx \
+	src/event/DeferEvent.cxx src/event/DeferEvent.hxx \
 	src/event/MaskMonitor.hxx src/event/MaskMonitor.cxx \
 	src/event/SocketMonitor.cxx src/event/SocketMonitor.hxx \
 	src/event/BufferedSocket.cxx src/event/BufferedSocket.hxx \
@@ -717,6 +762,7 @@ libstorage_a_SOURCES = \
 	src/storage/MemoryDirectoryReader.cxx src/storage/MemoryDirectoryReader.hxx \
 	src/storage/Configured.cxx src/storage/Configured.hxx \
 	src/storage/plugins/LocalStorage.cxx src/storage/plugins/LocalStorage.hxx \
+	src/storage/StorageState.cxx src/storage/StorageState.hxx \
 	src/storage/FileInfo.hxx
 
 libstorage_a_CPPFLAGS = $(AM_CPPFLAGS) \
@@ -769,6 +815,7 @@ libneighbor_a_SOURCES = \
 	src/neighbor/NeighborPlugin.hxx
 
 libneighbor_a_CPPFLAGS = $(AM_CPPFLAGS) \
+	$(UPNP_CFLAGS) \
 	$(SMBCLIENT_CFLAGS)
 
 if ENABLE_SMBCLIENT
@@ -818,6 +865,8 @@ libdb_plugins_a_SOURCES = \
 	src/db/plugins/simple/PrefixedLightSong.hxx \
 	src/db/plugins/simple/SimpleDatabasePlugin.cxx \
 	src/db/plugins/simple/SimpleDatabasePlugin.hxx
+libdb_plugins_a_CPPFLAGS = $(AM_CPPFLAGS) \
+	$(UPNP_CFLAGS)
 
 if ENABLE_LIBMPDCLIENT
 libdb_plugins_a_SOURCES += \
@@ -1195,6 +1244,7 @@ ENCODER_LIBS = \
 	$(VORBISENC_LIBS)
 
 libencoder_plugins_a_SOURCES = \
+	src/encoder/Configured.cxx src/encoder/Configured.hxx \
 	src/encoder/EncoderAPI.hxx \
 	src/encoder/EncoderInterface.hxx \
 	src/encoder/EncoderPlugin.hxx \
@@ -1276,7 +1326,6 @@ endif
 #
 
 libinput_a_SOURCES = \
-	src/input/Domain.cxx src/input/Domain.hxx \
 	src/input/Init.cxx src/input/Init.hxx \
 	src/input/Registry.cxx src/input/Registry.hxx \
 	src/input/Open.cxx \
@@ -1285,6 +1334,8 @@ libinput_a_SOURCES = \
 	src/input/InputStream.cxx src/input/InputStream.hxx \
 	src/input/Ptr.hxx \
 	src/input/InputPlugin.hxx \
+	src/input/RemoteTagScanner.hxx \
+	src/input/ScanTags.cxx src/input/ScanTags.hxx \
 	src/input/Reader.cxx src/input/Reader.hxx \
 	src/input/TextInputStream.cxx src/input/TextInputStream.hxx \
 	src/input/ThreadInputStream.cxx src/input/ThreadInputStream.hxx \
@@ -1325,6 +1376,33 @@ libinput_a_SOURCES += \
 	src/input/plugins/CurlInputPlugin.cxx src/input/plugins/CurlInputPlugin.hxx \
 	$(CURL_SOURCES) \
 	src/IcyMetaDataParser.cxx src/IcyMetaDataParser.hxx
+endif
+
+if ENABLE_TIDAL
+libinput_a_SOURCES += \
+	$(YAJL_SOURCES) \
+	src/input/plugins/TidalError.hxx \
+	src/input/plugins/TidalErrorParser.cxx src/input/plugins/TidalErrorParser.hxx \
+	src/input/plugins/TidalLoginRequest.cxx src/input/plugins/TidalLoginRequest.hxx \
+	src/input/plugins/TidalSessionManager.cxx src/input/plugins/TidalSessionManager.hxx \
+	src/input/plugins/TidalTrackRequest.cxx src/input/plugins/TidalTrackRequest.hxx \
+	src/input/plugins/TidalTagScanner.cxx src/input/plugins/TidalTagScanner.hxx \
+	src/input/plugins/TidalInputPlugin.cxx src/input/plugins/TidalInputPlugin.hxx
+INPUT_LIBS += $(YAJL_LIBS)
+endif
+
+if ENABLE_QOBUZ
+libinput_a_SOURCES += \
+	$(YAJL_SOURCES) \
+	src/lib/gcrypt/MD5.cxx src/lib/gcrypt/MD5.hxx \
+	src/input/plugins/QobuzSession.hxx \
+	src/input/plugins/QobuzClient.cxx src/input/plugins/QobuzClient.hxx \
+	src/input/plugins/QobuzErrorParser.cxx src/input/plugins/QobuzErrorParser.hxx \
+	src/input/plugins/QobuzLoginRequest.cxx src/input/plugins/QobuzLoginRequest.hxx \
+	src/input/plugins/QobuzTrackRequest.cxx src/input/plugins/QobuzTrackRequest.hxx \
+	src/input/plugins/QobuzTagScanner.cxx src/input/plugins/QobuzTagScanner.hxx \
+	src/input/plugins/QobuzInputPlugin.cxx src/input/plugins/QobuzInputPlugin.hxx
+INPUT_LIBS += $(YAJL_LIBS) $(LIBGCRYPT_LIBS)
 endif
 
 if ENABLE_SMBCLIENT
@@ -1381,7 +1459,6 @@ OUTPUT_LIBS = \
 OUTPUT_API_SRC = \
 	src/output/Client.hxx \
 	src/output/OutputAPI.hxx \
-	src/output/Interface.hxx \
 	src/output/Filtered.cxx src/output/Filtered.hxx \
 	src/output/Registry.cxx src/output/Registry.hxx \
 	src/output/MultipleOutputs.cxx src/output/MultipleOutputs.hxx \
@@ -1398,6 +1475,7 @@ OUTPUT_API_SRC = \
 	src/output/Init.cxx
 
 liboutput_plugins_a_SOURCES = \
+	src/output/Interface.cxx src/output/Interface.hxx \
 	src/output/Timer.cxx src/output/Timer.hxx \
 	src/output/plugins/NullOutputPlugin.cxx \
 	src/output/plugins/NullOutputPlugin.hxx
@@ -1613,6 +1691,7 @@ endif
 
 if ENABLE_SOUNDCLOUD
 libplaylist_plugins_a_SOURCES += \
+	$(YAJL_SOURCES) \
 	src/playlist/plugins/SoundCloudPlaylistPlugin.cxx \
 	src/playlist/plugins/SoundCloudPlaylistPlugin.hxx
 PLAYLIST_LIBS += $(YAJL_LIBS)
@@ -1634,6 +1713,12 @@ endif
 # Filter plugins
 #
 
+libfilter_api_a_SOURCES = \
+	src/filter/Observer.cxx src/filter/Observer.hxx \
+	src/filter/FilterPlugin.hxx \
+	src/filter/Prepared.hxx \
+	src/filter/Filter.cxx src/filter/Filter.hxx
+
 libfilter_plugins_a_SOURCES = \
 	src/AudioCompress/config.h \
 	src/AudioCompress/compress.h \
@@ -1653,8 +1738,15 @@ libfilter_plugins_a_SOURCES = \
 	src/filter/plugins/VolumeFilterPlugin.cxx \
 	src/filter/plugins/VolumeFilterPlugin.hxx
 
+libfilter_glue_a_SOURCES = \
+	src/filter/FilterRegistry.cxx src/filter/FilterRegistry.hxx \
+	src/filter/LoadOne.cxx src/filter/LoadOne.hxx \
+	src/filter/LoadChain.cxx src/filter/LoadChain.hxx
+
 FILTER_LIBS = \
+	libfilter_glue.a \
 	libfilter_plugins.a \
+	libfilter_api.a \
 	$(PCM_LIBS)
 
 
@@ -2044,8 +2136,7 @@ test_run_filter_LDADD = \
 	libsystem.a \
 	libutil.a
 test_run_filter_SOURCES = test/run_filter.cxx \
-	src/Log.cxx src/LogBackend.cxx \
-	src/filter/FilterPlugin.cxx src/filter/FilterRegistry.cxx
+	src/Log.cxx src/LogBackend.cxx
 
 if ENABLE_ENCODER
 noinst_PROGRAMS += test/run_encoder
@@ -2137,6 +2228,7 @@ test_run_output_LDADD = $(MPD_LIBS) \
 	libthread.a \
 	libutil.a
 test_run_output_SOURCES = test/run_output.cxx \
+	test/NullMixerListener.hxx \
 	src/Log.cxx src/LogBackend.cxx \
 	src/output/Domain.cxx \
 	src/output/Registry.cxx \
@@ -2148,6 +2240,7 @@ test_read_mixer_LDADD = \
 	libpcm.a \
 	libmixer_plugins.a \
 	$(OUTPUT_LIBS) \
+	libfilter_api.a \
 	libconf.a \
 	libbasic.a \
 	libevent.a \
@@ -2156,9 +2249,9 @@ test_read_mixer_LDADD = \
 	libsystem.a \
 	libutil.a
 test_read_mixer_SOURCES = test/read_mixer.cxx \
+	test/NullMixerListener.hxx \
 	src/Log.cxx src/LogBackend.cxx \
 	src/mixer/MixerControl.cxx \
-	src/filter/FilterPlugin.cxx \
 	src/filter/plugins/VolumeFilterPlugin.cxx
 
 if ENABLE_BZIP2_TEST
@@ -2193,7 +2286,7 @@ test_test_util_SOURCES = \
 	test/MimeTypeTest.hxx \
 	test/TestCircularBuffer.hxx \
 	test/test_util.cxx
-test_test_util_CPPFLAGS = $(AM_CPPFLAGS) $(CPPUNIT_CFLAGS) -DCPPUNIT_HAVE_RTTI=0
+test_test_util_CPPFLAGS = $(AM_CPPFLAGS) $(CPPUNIT_CFLAGS)
 test_test_util_CXXFLAGS = $(AM_CXXFLAGS) -Wno-error=deprecated-declarations
 test_test_util_LDADD = \
 	libutil.a \
@@ -2201,7 +2294,7 @@ test_test_util_LDADD = \
 
 test_test_byte_reverse_SOURCES = \
 	test/test_byte_reverse.cxx
-test_test_byte_reverse_CPPFLAGS = $(AM_CPPFLAGS) $(CPPUNIT_CFLAGS) -DCPPUNIT_HAVE_RTTI=0
+test_test_byte_reverse_CPPFLAGS = $(AM_CPPFLAGS) $(CPPUNIT_CFLAGS)
 test_test_byte_reverse_CXXFLAGS = $(AM_CXXFLAGS) -Wno-error=deprecated-declarations
 test_test_byte_reverse_LDADD = \
 	libutil.a \
@@ -2210,7 +2303,7 @@ test_test_byte_reverse_LDADD = \
 test_test_rewind_SOURCES = \
 	src/Log.cxx src/LogBackend.cxx \
 	test/test_rewind.cxx
-test_test_rewind_CPPFLAGS = $(AM_CPPFLAGS) $(CPPUNIT_CFLAGS) -DCPPUNIT_HAVE_RTTI=0
+test_test_rewind_CPPFLAGS = $(AM_CPPFLAGS) $(CPPUNIT_CFLAGS)
 test_test_rewind_CXXFLAGS = $(AM_CXXFLAGS) -Wno-error=deprecated-declarations
 test_test_rewind_LDADD = \
 	$(INPUT_LIBS) \
@@ -2222,7 +2315,7 @@ test_test_rewind_LDADD = \
 test_test_mixramp_SOURCES = \
 	src/Log.cxx src/LogBackend.cxx \
 	test/test_mixramp.cxx
-test_test_mixramp_CPPFLAGS = $(AM_CPPFLAGS) $(CPPUNIT_CFLAGS) -DCPPUNIT_HAVE_RTTI=0
+test_test_mixramp_CPPFLAGS = $(AM_CPPFLAGS) $(CPPUNIT_CFLAGS)
 test_test_mixramp_CXXFLAGS = $(AM_CXXFLAGS) -Wno-error=deprecated-declarations
 test_test_mixramp_LDADD = \
 	libutil.a \
@@ -2232,7 +2325,7 @@ if ENABLE_CURL
 test_test_icy_parser_SOURCES = \
 	src/Log.cxx src/LogBackend.cxx \
 	test/test_icy_parser.cxx
-test_test_icy_parser_CPPFLAGS = $(AM_CPPFLAGS) $(CPPUNIT_CFLAGS) -DCPPUNIT_HAVE_RTTI=0
+test_test_icy_parser_CPPFLAGS = $(AM_CPPFLAGS) $(CPPUNIT_CFLAGS)
 test_test_icy_parser_CXXFLAGS = $(AM_CXXFLAGS) -Wno-error=deprecated-declarations
 test_test_icy_parser_LDADD = \
 	libtag.a \
@@ -2253,7 +2346,7 @@ test_test_pcm_SOURCES = \
 	test/test_pcm_export.cxx \
 	test/test_pcm_all.hxx \
 	test/test_pcm_main.cxx
-test_test_pcm_CPPFLAGS = $(AM_CPPFLAGS) $(CPPUNIT_CFLAGS) -DCPPUNIT_HAVE_RTTI=0
+test_test_pcm_CPPFLAGS = $(AM_CPPFLAGS) $(CPPUNIT_CFLAGS)
 test_test_pcm_CXXFLAGS = $(AM_CXXFLAGS) -Wno-error=deprecated-declarations
 test_test_pcm_LDADD = \
 	$(PCM_LIBS) \
@@ -2264,7 +2357,7 @@ test_test_pcm_LDADD = \
 test_test_archive_SOURCES = \
 	src/Log.cxx src/LogBackend.cxx \
 	test/test_archive.cxx
-test_test_archive_CPPFLAGS = $(AM_CPPFLAGS) $(CPPUNIT_CFLAGS) -DCPPUNIT_HAVE_RTTI=0
+test_test_archive_CPPFLAGS = $(AM_CPPFLAGS) $(CPPUNIT_CFLAGS)
 test_test_archive_CXXFLAGS = $(AM_CXXFLAGS) -Wno-error=deprecated-declarations
 test_test_archive_LDADD = \
 	libarchive.a \
@@ -2281,7 +2374,7 @@ test_test_translate_song_SOURCES = \
 	src/LocateUri.cxx \
 	src/Log.cxx \
 	test/test_translate_song.cxx
-test_test_translate_song_CPPFLAGS = $(AM_CPPFLAGS) $(CPPUNIT_CFLAGS) -DCPPUNIT_HAVE_RTTI=0
+test_test_translate_song_CPPFLAGS = $(AM_CPPFLAGS) $(CPPUNIT_CFLAGS)
 test_test_translate_song_CXXFLAGS = $(AM_CXXFLAGS) -Wno-error=deprecated-declarations
 test_test_translate_song_LDADD = \
 	$(STORAGE_LIBS) \
@@ -2297,7 +2390,7 @@ endif
 test_test_protocol_SOURCES = \
 	src/protocol/ArgParser.cxx \
 	test/test_protocol.cxx
-test_test_protocol_CPPFLAGS = $(AM_CPPFLAGS) $(CPPUNIT_CFLAGS) -DCPPUNIT_HAVE_RTTI=0
+test_test_protocol_CPPFLAGS = $(AM_CPPFLAGS) $(CPPUNIT_CFLAGS)
 test_test_protocol_CXXFLAGS = $(AM_CXXFLAGS) -Wno-error=deprecated-declarations
 test_test_protocol_LDADD = \
 	libsystem.a \
@@ -2308,7 +2401,7 @@ test_test_queue_priority_SOURCES = \
 	src/queue/Queue.cxx \
 	src/DetachedSong.cxx \
 	test/test_queue_priority.cxx
-test_test_queue_priority_CPPFLAGS = $(AM_CPPFLAGS) $(CPPUNIT_CFLAGS) -DCPPUNIT_HAVE_RTTI=0
+test_test_queue_priority_CPPFLAGS = $(AM_CPPFLAGS) $(CPPUNIT_CFLAGS)
 test_test_queue_priority_CXXFLAGS = $(AM_CXXFLAGS) -Wno-error=deprecated-declarations
 test_test_queue_priority_LDADD = \
 	libsystem.a \
@@ -2317,7 +2410,7 @@ test_test_queue_priority_LDADD = \
 
 test_TestFs_SOURCES = \
 	test/TestFs.cxx
-test_TestFs_CPPFLAGS = $(AM_CPPFLAGS) $(CPPUNIT_CFLAGS) -DCPPUNIT_HAVE_RTTI=0
+test_TestFs_CPPFLAGS = $(AM_CPPFLAGS) $(CPPUNIT_CFLAGS)
 test_TestFs_CXXFLAGS = $(AM_CXXFLAGS) -Wno-error=deprecated-declarations
 test_TestFs_LDADD = \
 	$(FS_LIBS) \
@@ -2325,7 +2418,7 @@ test_TestFs_LDADD = \
 
 test_TestIcu_SOURCES = \
 	test/TestIcu.cxx
-test_TestIcu_CPPFLAGS = $(AM_CPPFLAGS) $(CPPUNIT_CFLAGS) -DCPPUNIT_HAVE_RTTI=0
+test_TestIcu_CPPFLAGS = $(AM_CPPFLAGS) $(CPPUNIT_CFLAGS)
 test_TestIcu_CXXFLAGS = $(AM_CXXFLAGS) -Wno-error=deprecated-declarations
 test_TestIcu_LDADD = \
 	$(ICU_LDADD) \
@@ -2417,6 +2510,7 @@ EXTRA_DIST = $(doc_DATA) autogen.sh \
 	$(man_MANS) $(DOCBOOK_FILES) doc/mpdconf.example doc/doxygen.conf \
 	$(wildcard $(srcdir)/doc/include/*.xml) \
 	systemd/system/mpd.socket \
+	$(wildcard $(srcdir)/python/build/*.py) \
 	android/AndroidManifest.xml \
 	android/build.py \
 	android/custom_rules.xml \
@@ -2424,5 +2518,6 @@ EXTRA_DIST = $(doc_DATA) autogen.sh \
 	android/src/Bridge.java \
 	android/src/Loader.java \
 	android/src/Main.java \
+	win32/build.py \
 	win32/res/mpd.rc.in win32/res/mpd.ico \
 	src/haiku/App_MusicPD

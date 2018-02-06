@@ -25,9 +25,9 @@
 #include <algorithm>
 
 BufferedSocket::ssize_t
-BufferedSocket::DirectRead(void *data, size_t length)
+BufferedSocket::DirectRead(void *data, size_t length) noexcept
 {
-	const auto nbytes = SocketMonitor::Read((char *)data, length);
+	const auto nbytes = GetSocket().Read((char *)data, length);
 	if (gcc_likely(nbytes > 0))
 		return nbytes;
 
@@ -48,12 +48,12 @@ BufferedSocket::DirectRead(void *data, size_t length)
 }
 
 bool
-BufferedSocket::ReadToBuffer()
+BufferedSocket::ReadToBuffer() noexcept
 {
 	assert(IsDefined());
 
 	const auto buffer = input.Write();
-	assert(!buffer.IsEmpty());
+	assert(!buffer.empty());
 
 	const auto nbytes = DirectRead(buffer.data, buffer.size);
 	if (nbytes > 0)
@@ -63,13 +63,13 @@ BufferedSocket::ReadToBuffer()
 }
 
 bool
-BufferedSocket::ResumeInput()
+BufferedSocket::ResumeInput() noexcept
 {
 	assert(IsDefined());
 
 	while (true) {
 		const auto buffer = input.Read();
-		if (buffer.IsEmpty()) {
+		if (buffer.empty()) {
 			ScheduleRead();
 			return true;
 		}
@@ -99,7 +99,7 @@ BufferedSocket::ResumeInput()
 }
 
 bool
-BufferedSocket::OnSocketReady(unsigned flags)
+BufferedSocket::OnSocketReady(unsigned flags) noexcept
 {
 	assert(IsDefined());
 

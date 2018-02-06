@@ -17,27 +17,47 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-/** \file
- *
- * Utility functions for filter configuration
- */
+#ifndef MPD_ALSA_ALLOWED_FORMAT_HXX
+#define MPD_ALSA_ALLOWED_FORMAT_HXX
 
-#ifndef MPD_FILTER_CONFIG_HXX
-#define MPD_FILTER_CONFIG_HXX
+#include "check.h"
+#include "AudioFormat.hxx"
 
-class PreparedFilter;
+#include <forward_list>
+#include <string>
+
+struct StringView;
+
+namespace Alsa {
 
 /**
- * Builds a filter chain from a configuration string on the form
- * "name1, name2, name3, ..." by looking up each name among the
- * configured filter sections.
- *
- * Throws std::runtime_error on error.
- *
- * @param chain the chain to append filters on
- * @param spec the filter chain specification
+ * An audio format for the "allowed_formats" setting of
+ * #AlsaOutputPlugin.
  */
-void
-filter_chain_parse(PreparedFilter &chain, const char *spec);
+struct AllowedFormat {
+	AudioFormat format;
+#ifdef ENABLE_DSD
+	bool dop;
+#endif
+
+	/**
+	 * Parse a format string.
+	 *
+	 * Throws std::runtime_error on error.
+	 */
+	explicit AllowedFormat(StringView s);
+
+	/**
+	 * Parse a list of formats separated by space.
+	 *
+	 * Throws std::runtime_error on error.
+	 */
+	static std::forward_list<AllowedFormat> ParseList(StringView s);
+};
+
+std::string
+ToString(const std::forward_list<AllowedFormat> &allowed_formats) noexcept;
+
+} // namespace Alsa
 
 #endif

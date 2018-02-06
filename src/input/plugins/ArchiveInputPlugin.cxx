@@ -60,27 +60,6 @@ OpenArchiveInputStream(Path path, Mutex &mutex, Cond &cond)
 		return nullptr;
 	}
 
-	auto file = archive_file_open(arplug, Path::FromFS(archive));
-
-	AtScopeExit(file) {
-		file->Close();
-	};
-
-	return InputStreamPtr(file->OpenStream(filename, mutex, cond));
+	return archive_file_open(arplug, Path::FromFS(archive))
+		->OpenStream(filename, mutex, cond);
 }
-
-static InputStream *
-input_archive_open(gcc_unused const char *filename,
-		   gcc_unused Mutex &mutex, gcc_unused Cond &cond)
-{
-	/* dummy method; use OpenArchiveInputStream() instead */
-
-	return nullptr;
-}
-
-const InputPlugin input_plugin_archive = {
-	"archive",
-	nullptr,
-	nullptr,
-	input_archive_open,
-};

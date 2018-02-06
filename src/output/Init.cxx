@@ -22,12 +22,13 @@
 #include "Registry.hxx"
 #include "Domain.hxx"
 #include "OutputAPI.hxx"
-#include "filter/FilterConfig.hxx"
 #include "AudioParser.hxx"
 #include "mixer/MixerList.hxx"
 #include "mixer/MixerType.hxx"
 #include "mixer/MixerControl.hxx"
 #include "mixer/plugins/SoftwareMixerPlugin.hxx"
+#include "filter/LoadChain.hxx"
+#include "filter/Prepared.hxx"
 #include "filter/plugins/AutoConvertFilterPlugin.hxx"
 #include "filter/plugins/ConvertFilterPlugin.hxx"
 #include "filter/plugins/ReplayGainFilterPlugin.hxx"
@@ -38,6 +39,7 @@
 #include "config/ConfigGlobal.hxx"
 #include "config/Block.hxx"
 #include "util/RuntimeError.hxx"
+#include "util/StringFormat.hxx"
 #include "Log.hxx"
 
 #include <stdexcept>
@@ -164,12 +166,7 @@ FilteredAudioOutput::Configure(const ConfigBlock &block)
 		config_audio_format.Clear();
 	}
 
-	{
-		char buffer[64];
-		snprintf(buffer, sizeof(buffer), "\"%s\" (%s)",
-			 name, plugin_name);
-		log_name = buffer;
-	}
+	log_name = StringFormat<256>("\"%s\" (%s)", name, plugin_name);
 
 	/* set up the filter chain */
 
@@ -186,11 +183,11 @@ FilteredAudioOutput::Configure(const ConfigBlock &block)
 	try {
 		filter_chain_parse(*prepared_filter,
 				   block.GetBlockValue(AUDIO_FILTERS, ""));
-	} catch (const std::runtime_error &e) {
+	} catch (...) {
 		/* It's not really fatal - Part of the filter chain
 		   has been set up already and even an empty one will
 		   work (if only with unexpected behaviour) */
-		FormatError(e,
+		FormatError(std::current_exception(),
 			    "Failed to initialize filter chain for '%s'",
 			    name);
 	}
@@ -220,9 +217,6 @@ FilteredAudioOutput::Setup(EventLoop &event_loop,
 		prepared_other_replay_gain_filter =
 			NewReplayGainFilter(replay_gain_config);
 		assert(prepared_other_replay_gain_filter != nullptr);
-	} else {
-		prepared_replay_gain_filter = nullptr;
-		prepared_other_replay_gain_filter = nullptr;
 	}
 
 	/* set up the mixer */
@@ -232,8 +226,8 @@ FilteredAudioOutput::Setup(EventLoop &event_loop,
 						mixer_plugin,
 						*prepared_filter,
 						mixer_listener);
-	} catch (const std::runtime_error &e) {
-		FormatError(e,
+	} catch (...) {
+		FormatError(std::current_exception(),
 			    "Failed to initialize hardware mixer for '%s'",
 			    name);
 	}
@@ -258,7 +252,7 @@ FilteredAudioOutput::Setup(EventLoop &event_loop,
 			    convert_filter.Set(convert_filter_prepare()));
 }
 
-FilteredAudioOutput *
+std::unique_ptr<FilteredAudioOutput>
 audio_output_new(EventLoop &event_loop,
 		 const ReplayGainConfig &replay_gain_config,
 		 const ConfigBlock &block,
@@ -278,7 +272,7 @@ audio_output_new(EventLoop &event_loop,
 			throw FormatRuntimeError("No such audio output plugin: %s", p);
 	} else {
 		LogWarning(output_domain,
-			   "No 'AudioOutput' defined in config file");
+			   "No 'audio_output' defined in config file");
 
 		plugin = audio_output_detect();
 
@@ -291,16 +285,10 @@ audio_output_new(EventLoop &event_loop,
 						       block));
 	assert(ao != nullptr);
 
-	auto *f = new FilteredAudioOutput(plugin->name, std::move(ao), block);
-
-	try {
-		f->Setup(event_loop, replay_gain_config,
-			 plugin->mixer_plugin,
-			 mixer_listener, block);
-	} catch (...) {
-		delete f;
-		throw;
-	}
-
+	auto f = std::make_unique<FilteredAudioOutput>(plugin->name,
+						       std::move(ao), block);
+	f->Setup(event_loop, replay_gain_config,
+		 plugin->mixer_plugin,
+		 mixer_listener, block);
 	return f;
 }

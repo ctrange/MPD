@@ -22,18 +22,20 @@
 
 #include "check.h"
 
+#include <memory>
+
 struct ReplayGainInfo;
 struct TagHandler;
 struct Tag;
 
 bool
-vorbis_comments_to_replay_gain(ReplayGainInfo &rgi, char **comments);
+vorbis_comments_to_replay_gain(ReplayGainInfo &rgi, char **comments) noexcept;
 
 void
 vorbis_comments_scan(char **comments,
 		     const TagHandler &handler, void *handler_ctx);
 
-Tag *
-vorbis_comments_to_tag(char **comments);
+std::unique_ptr<Tag>
+vorbis_comments_to_tag(char **comments) noexcept;
 
 #endif

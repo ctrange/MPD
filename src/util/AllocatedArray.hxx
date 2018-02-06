@@ -72,7 +72,7 @@ public:
 
 	AllocatedArray(AllocatedArray &&other)
 		:buffer(other.buffer) {
-		other.buffer = Buffer::Null();
+		other.buffer = nullptr;
 	}
 
 	~AllocatedArray() {
@@ -112,7 +112,7 @@ public:
 	 * Returns true if no memory was allocated so far.
 	 */
 	constexpr bool empty() const {
-		return buffer.IsEmpty();
+		return buffer.empty();
 	}
 
 	/**

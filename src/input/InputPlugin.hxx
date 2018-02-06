@@ -20,19 +20,14 @@
 #ifndef MPD_INPUT_PLUGIN_HXX
 #define MPD_INPUT_PLUGIN_HXX
 
-#ifdef WIN32
-#include <windows.h>
-/* damn you, windows.h! */
-#ifdef ERROR
-#undef ERROR
-#endif
-#endif
+#include "Ptr.hxx"
 
 struct ConfigBlock;
 class Mutex;
 class Cond;
 class EventLoop;
-class InputStream;
+class RemoteTagScanner;
+class RemoteTagHandler;
 
 struct InputPlugin {
 	const char *name;
@@ -56,8 +51,19 @@ struct InputPlugin {
 	/**
 	 * Throws std::runtime_error on error.
 	 */
-	InputStream *(*open)(const char *uri,
-			     Mutex &mutex, Cond &cond);
+	InputStreamPtr (*open)(const char *uri,
+			       Mutex &mutex, Cond &cond);
+
+	/**
+	 * Prepare a #RemoteTagScanner.  The operation must be started
+	 * using RemoteTagScanner::Start().
+	 *
+	 * Throws on error.
+	 *
+	 * @return nullptr if the given URI is not supported.
+	 */
+	std::unique_ptr<RemoteTagScanner> (*scan_tags)(const char *uri,
+						       RemoteTagHandler &handler) = nullptr;
 };
 
 #endif

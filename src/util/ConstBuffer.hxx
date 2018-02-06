@@ -60,10 +60,6 @@ struct ConstBuffer<void> {
 	constexpr ConstBuffer(pointer_type _data, size_type _size)
 		:data(_data), size(_size) {}
 
-	constexpr static ConstBuffer Null() {
-		return ConstBuffer(nullptr, 0);
-	}
-
 	constexpr static ConstBuffer<void> FromVoid(ConstBuffer<void> other) {
 		return other;
 	}
@@ -84,7 +80,7 @@ struct ConstBuffer<void> {
 		return data != nullptr;
 	}
 
-	constexpr bool IsEmpty() const {
+	constexpr bool empty() const {
 		return size == 0;
 	}
 };
@@ -113,16 +109,15 @@ struct ConstBuffer {
 	constexpr ConstBuffer(pointer_type _data, size_type _size)
 		:data(_data), size(_size) {}
 
+	constexpr ConstBuffer(pointer_type _data, pointer_type _end)
+		:data(_data), size(_end - _data) {}
+
 	/**
 	 * Convert array to ConstBuffer instance.
 	 */
 	template<size_type _size>
 	constexpr ConstBuffer(const T (&_data)[_size])
 		:data(_data), size(_size) {}
-
-	constexpr static ConstBuffer Null() {
-		return ConstBuffer(nullptr, 0);
-	}
 
 	/**
 	 * Cast a ConstBuffer<void> to a ConstBuffer<T>, rounding down
@@ -144,6 +139,7 @@ struct ConstBuffer {
 	constexpr
 #endif
 	static ConstBuffer<T> FromVoid(ConstBuffer<void> other) {
+		static_assert(sizeof(T) > 0, "Empty base type");
 #ifndef NDEBUG
 		assert(other.size % sizeof(T) == 0);
 #endif
@@ -167,7 +163,7 @@ struct ConstBuffer {
 		return data != nullptr;
 	}
 
-	constexpr bool IsEmpty() const {
+	constexpr bool empty() const {
 		return size == 0;
 	}
 
@@ -217,7 +213,7 @@ struct ConstBuffer {
 #endif
 	reference_type front() const {
 #ifndef NDEBUG
-		assert(!IsEmpty());
+		assert(!empty());
 #endif
 		return data[0];
 	}
@@ -231,7 +227,7 @@ struct ConstBuffer {
 #endif
 	reference_type back() const {
 #ifndef NDEBUG
-		assert(!IsEmpty());
+		assert(!empty());
 #endif
 		return data[size - 1];
 	}
@@ -242,7 +238,7 @@ struct ConstBuffer {
 	 */
 	void pop_front() {
 #ifndef NDEBUG
-		assert(!IsEmpty());
+		assert(!empty());
 #endif
 
 		++data;
@@ -255,7 +251,7 @@ struct ConstBuffer {
 	 */
 	void pop_back() {
 #ifndef NDEBUG
-		assert(!IsEmpty());
+		assert(!empty());
 #endif
 
 		--size;

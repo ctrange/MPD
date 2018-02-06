@@ -1,5 +1,5 @@
 /*
- * Copyright 2003-2017 The Music Player Daemon Project
+ * Copyright 2003-2018 The Music Player Daemon Project
  * http://www.musicpd.org
  *
  * This program is free software; you can redistribute it and/or modify
@@ -17,8 +17,33 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#include "config.h"
-#include "Domain.hxx"
-#include "util/Domain.hxx"
+#include "MD5.hxx"
+#include "util/ConstBuffer.hxx"
 
-const Domain input_domain("input");
+#include <gcrypt.h>
+
+#include <stdio.h>
+
+std::array<uint8_t, 16>
+MD5(ConstBuffer<void> input) noexcept
+{
+	std::array<uint8_t, 16> result;
+	gcry_md_hash_buffer(GCRY_MD_MD5, &result.front(),
+			    input.data, input.size);
+	return result;
+}
+
+std::array<char, 33>
+MD5Hex(ConstBuffer<void> input) noexcept
+{
+	const auto raw = MD5(input);
+	std::array<char, 33> result;
+
+	char *p = &result.front();
+	for (const auto i : raw) {
+		sprintf(p, "%02x", i);
+		p += 2;
+	}
+
+	return result;
+}

@@ -19,14 +19,12 @@
 
 #include "config.h"
 #include "ConvertFilterPlugin.hxx"
-#include "filter/FilterPlugin.hxx"
-#include "filter/FilterInternal.hxx"
-#include "filter/FilterRegistry.hxx"
+#include "filter/Filter.hxx"
+#include "filter/Prepared.hxx"
 #include "pcm/PcmConvert.hxx"
 #include "util/Manual.hxx"
 #include "util/ConstBuffer.hxx"
 #include "AudioFormat.hxx"
-#include "poison.h"
 
 #include <stdexcept>
 #include <memory>
@@ -52,23 +50,28 @@ public:
 
 	void Set(const AudioFormat &_out_audio_format);
 
-	void Reset() override {
+	void Reset() noexcept override {
 		state.Reset();
 	}
 
 	ConstBuffer<void> FilterPCM(ConstBuffer<void> src) override;
+
+	ConstBuffer<void> Flush() override {
+		return IsActive()
+			? state.Flush()
+			: nullptr;
+	}
+
+private:
+	bool IsActive() const noexcept {
+		return out_audio_format != in_audio_format;
+	}
 };
 
 class PreparedConvertFilter final : public PreparedFilter {
 public:
-	Filter *Open(AudioFormat &af) override;
+	std::unique_ptr<Filter> Open(AudioFormat &af) override;
 };
-
-static PreparedFilter *
-convert_filter_init(gcc_unused const ConfigBlock &block)
-{
-	return new PreparedConvertFilter();
-}
 
 void
 ConvertFilter::Set(const AudioFormat &_out_audio_format)
@@ -80,7 +83,7 @@ ConvertFilter::Set(const AudioFormat &_out_audio_format)
 		/* no change */
 		return;
 
-	if (out_audio_format != in_audio_format) {
+	if (IsActive()) {
 		out_audio_format = in_audio_format;
 		state.Close();
 	}
@@ -99,19 +102,19 @@ ConvertFilter::ConvertFilter(const AudioFormat &audio_format)
 {
 }
 
-Filter *
+std::unique_ptr<Filter>
 PreparedConvertFilter::Open(AudioFormat &audio_format)
 {
 	assert(audio_format.IsValid());
 
-	return new ConvertFilter(audio_format);
+	return std::make_unique<ConvertFilter>(audio_format);
 }
 
 ConvertFilter::~ConvertFilter()
 {
 	assert(in_audio_format.IsValid());
 
-	if (out_audio_format != in_audio_format)
+	if (IsActive())
 		state.Close();
 }
 
@@ -120,22 +123,16 @@ ConvertFilter::FilterPCM(ConstBuffer<void> src)
 {
 	assert(in_audio_format.IsValid());
 
-	if (out_audio_format == in_audio_format)
+	return IsActive()
+		? state.Convert(src)
 		/* optimized special case: no-op */
-		return src;
-
-	return state.Convert(src);
+		: src;
 }
 
-const FilterPlugin convert_filter_plugin = {
-	"convert",
-	convert_filter_init,
-};
-
-PreparedFilter *
+std::unique_ptr<PreparedFilter>
 convert_filter_prepare() noexcept
 {
-	return new PreparedConvertFilter();
+	return std::make_unique<PreparedConvertFilter>();
 }
 
 Filter *

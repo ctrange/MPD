@@ -23,6 +23,7 @@
 #include "queue/Queue.hxx"
 
 enum TagType : uint8_t;
+struct Tag;
 struct PlayerControl;
 class DetachedSong;
 class Database;
@@ -192,6 +193,7 @@ public:
 	 * the song matches.
 	 */
 	void TagModified(DetachedSong &&song);
+	void TagModified(const char *uri, const Tag &tag) noexcept;
 
 #ifdef ENABLE_DATABASE
 	/**
@@ -276,46 +278,46 @@ public:
 	void Stop(PlayerControl &pc);
 
 	/**
-	 * Throws std::runtime_error or #Error on error.
+	 * Throws on error.
 	 */
 	void PlayPosition(PlayerControl &pc, int position);
 
 	/**
-	 * Throws std::runtime_error or #Error on error.
+	 * Throws on error.
 	 */
 	void PlayOrder(PlayerControl &pc, unsigned order);
 
 	/**
-	 * Throws std::runtime_error or #Error on error.
+	 * Throws on error.
 	 */
 	void PlayId(PlayerControl &pc, int id);
 
 	/**
-	 * Throws std::runtime_error or #Error on error.
+	 * Throws on error.
 	 */
 	void PlayNext(PlayerControl &pc);
 
 	/**
-	 * Throws std::runtime_error or #Error on error.
+	 * Throws on error.
 	 */
 	void PlayPrevious(PlayerControl &pc);
 
 	/**
-	 * Throws std::runtime_error or #Error on error.
+	 * Throws on error.
 	 */
 	void SeekSongOrder(PlayerControl &pc,
 			   unsigned song_order,
 			   SongTime seek_time);
 
 	/**
-	 * Throws std::runtime_error or #Error on error.
+	 * Throws on error.
 	 */
 	void SeekSongPosition(PlayerControl &pc,
 			      unsigned sonag_position,
 			      SongTime seek_time);
 
 	/**
-	 * Throws std::runtime_error or #Error on error.
+	 * Throws on error.
 	 */
 	void SeekSongId(PlayerControl &pc,
 			unsigned song_id, SongTime seek_time);
@@ -324,7 +326,7 @@ public:
 	 * Seek within the current song.  Fails if MPD is not currently
 	 * playing.
 	 *
-	 * Throws std::runtime_error or #Error on error.
+	 * Throws on error.
 	 *
 	 * @param seek_time the time
 	 * @param relative if true, then the specified time is relative to the

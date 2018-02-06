@@ -31,11 +31,11 @@
 #endif
 
 #ifdef HAVE_THREAD_NAME
-#  include <stdio.h>
+#include "util/StringFormat.hxx"
 #endif
 
 static inline void
-SetThreadName(const char *name)
+SetThreadName(const char *name) noexcept
 {
 #if defined(HAVE_PTHREAD_SETNAME_NP) && !defined(__NetBSD__)
 	/* not using pthread_setname_np() on NetBSD because it
@@ -56,12 +56,10 @@ SetThreadName(const char *name)
 
 template<typename... Args>
 static inline void
-FormatThreadName(const char *fmt, gcc_unused Args&&... args)
+FormatThreadName(const char *fmt, gcc_unused Args&&... args) noexcept
 {
 #ifdef HAVE_THREAD_NAME
-	char buffer[16];
-	snprintf(buffer, sizeof(buffer), fmt, args...);
-	SetThreadName(buffer);
+	SetThreadName(StringFormat<16>(fmt, args...));
 #else
 	(void)fmt;
 #endif

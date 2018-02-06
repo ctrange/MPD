@@ -23,6 +23,11 @@
 #include "Idle.hxx"
 #include "Stats.hxx"
 
+#ifdef ENABLE_CURL
+#include "RemoteTagCache.hxx"
+#include "util/UriUtil.hxx"
+#endif
+
 #ifdef ENABLE_DATABASE
 #include "db/DatabaseError.hxx"
 
@@ -32,12 +37,14 @@
 #endif
 #endif
 
-#include <stdexcept>
+#include <exception>
 
 Instance::Instance()
 	:idle_monitor(event_loop, BIND_THIS_METHOD(OnIdle))
 {
 }
+
+Instance::~Instance() noexcept = default;
 
 Partition *
 Instance::FindPartition(const char *name) noexcept
@@ -84,7 +91,7 @@ Instance::OnDatabaseSongRemoved(const char *uri)
 	if (sticker_enabled()) {
 		try {
 			sticker_song_delete(uri);
-		} catch (const std::runtime_error &) {
+		} catch (...) {
 		}
 	}
 #endif
@@ -98,17 +105,45 @@ Instance::OnDatabaseSongRemoved(const char *uri)
 #ifdef ENABLE_NEIGHBOR_PLUGINS
 
 void
-Instance::FoundNeighbor(gcc_unused const NeighborInfo &info)
+Instance::FoundNeighbor(gcc_unused const NeighborInfo &info) noexcept
 {
 	for (auto &partition : partitions)
 		partition.EmitIdle(IDLE_NEIGHBOR);
 }
 
 void
-Instance::LostNeighbor(gcc_unused const NeighborInfo &info)
+Instance::LostNeighbor(gcc_unused const NeighborInfo &info) noexcept
 {
 	for (auto &partition : partitions)
 		partition.EmitIdle(IDLE_NEIGHBOR);
+}
+
+#endif
+
+#ifdef ENABLE_CURL
+
+void
+Instance::LookupRemoteTag(const char *uri) noexcept
+{
+	if (!uri_has_scheme(uri))
+		return;
+
+	if (!remote_tag_cache)
+		remote_tag_cache = std::make_unique<RemoteTagCache>(event_loop,
+								    *this);
+
+	remote_tag_cache->Lookup(uri);
+}
+
+void
+Instance::OnRemoteTag(const char *uri, const Tag &tag) noexcept
+{
+	if (!tag.IsDefined())
+		/* boring */
+		return;
+
+	for (auto &partition : partitions)
+		partition.TagModified(uri, tag);
 }
 
 #endif

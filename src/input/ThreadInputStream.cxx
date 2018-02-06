@@ -27,7 +27,7 @@
 ThreadInputStream::ThreadInputStream(const char *_plugin,
 				     const char *_uri,
 				     Mutex &_mutex, Cond &_cond,
-				     size_t _buffer_size)
+				     size_t _buffer_size) noexcept
 	:InputStream(_uri, _mutex, _cond),
 	 plugin(_plugin),
 	 thread(BIND_THIS_METHOD(ThreadFunc)),
@@ -37,7 +37,7 @@ ThreadInputStream::ThreadInputStream(const char *_plugin,
 	allocation.ForkCow(false);
 }
 
-ThreadInputStream::~ThreadInputStream()
+ThreadInputStream::~ThreadInputStream() noexcept
 {
 	{
 		const std::lock_guard<Mutex> lock(mutex);
@@ -58,8 +58,8 @@ ThreadInputStream::Start()
 	thread.Start();
 }
 
-void
-ThreadInputStream::ThreadFunc()
+inline void
+ThreadInputStream::ThreadFunc() noexcept
 {
 	FormatThreadName("input:%s", plugin);
 
@@ -80,7 +80,7 @@ ThreadInputStream::ThreadFunc()
 		assert(!postponed_exception);
 
 		auto w = buffer.Write();
-		if (w.IsEmpty()) {
+		if (w.empty()) {
 			wake_cond.wait(mutex);
 		} else {
 			size_t nbytes;
@@ -122,7 +122,7 @@ ThreadInputStream::IsAvailable() noexcept
 {
 	assert(!thread.IsInside());
 
-	return !buffer.IsEmpty() || eof || postponed_exception;
+	return !buffer.empty() || eof || postponed_exception;
 }
 
 inline size_t
@@ -135,7 +135,7 @@ ThreadInputStream::Read(void *ptr, size_t read_size)
 			std::rethrow_exception(postponed_exception);
 
 		auto r = buffer.Read();
-		if (!r.IsEmpty()) {
+		if (!r.empty()) {
 			size_t nbytes = std::min(read_size, r.size);
 			memcpy(ptr, r.data, nbytes);
 			buffer.Consume(nbytes);

@@ -62,7 +62,7 @@ try {
 	while (true) {
 		{
 			const auto dest = buffer.Write();
-			assert(!dest.IsEmpty());
+			assert(!dest.empty());
 
 			ssize_t nbytes = read(0, dest.data, dest.size);
 			if (nbytes <= 0)
@@ -72,15 +72,24 @@ try {
 		}
 
 		auto src = buffer.Read();
-		assert(!src.IsEmpty());
+		assert(!src.empty());
 
 		src.size -= src.size % in_frame_size;
-		if (src.IsEmpty())
+		if (src.empty())
 			continue;
 
 		buffer.Consume(src.size);
 
 		auto output = state.Convert({src.data, src.size});
+
+		gcc_unused ssize_t ignored = write(1, output.data,
+						   output.size);
+	}
+
+	while (true) {
+		auto output = state.Flush();
+		if (output.IsNull())
+			break;
 
 		gcc_unused ssize_t ignored = write(1, output.data,
 						   output.size);

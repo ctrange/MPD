@@ -78,9 +78,16 @@ public:
 	/**
 	 * To start sending the request, call Start().
 	 */
-	CurlRequest(CurlGlobal &_global, const char *url,
+	CurlRequest(CurlGlobal &_global,
 		    CurlResponseHandler &_handler);
-	~CurlRequest();
+
+	CurlRequest(CurlGlobal &_global, const char *url,
+		    CurlResponseHandler &_handler)
+		:CurlRequest(_global, _handler) {
+		SetUrl(url);
+	}
+
+	~CurlRequest() noexcept;
 
 	CurlRequest(const CurlRequest &) = delete;
 	CurlRequest &operator=(const CurlRequest &) = delete;
@@ -94,13 +101,23 @@ public:
 	void Start();
 
 	/**
+	 * A thread-safe version of Start().
+	 */
+	void StartIndirect();
+
+	/**
 	 * Unregister this request via CurlGlobal::Remove().
 	 *
 	 * This method must be called in the event loop thread.
 	 */
-	void Stop();
+	void Stop() noexcept;
 
-	CURL *Get() {
+	/**
+	 * A thread-safe version of Stop().
+	 */
+	void StopIndirect();
+
+	CURL *Get() noexcept {
 		return easy.Get();
 	}
 
@@ -109,42 +126,46 @@ public:
 		easy.SetOption(option, value);
 	}
 
+	void SetUrl(const char *url) {
+		easy.SetOption(CURLOPT_URL, url);
+	}
+
 	/**
 	 * CurlResponseHandler::OnData() shall throw this to pause the
 	 * stream.  Call Resume() to resume the transfer.
 	 */
 	struct Pause {};
 
-	void Resume();
+	void Resume() noexcept;
 
 	/**
 	 * A HTTP request is finished.  Called by #CurlGlobal.
 	 */
-	void Done(CURLcode result);
+	void Done(CURLcode result) noexcept;
 
 private:
 	/**
 	 * Frees the current "libcurl easy" handle, and everything
 	 * associated with it.
 	 */
-	void FreeEasy();
+	void FreeEasy() noexcept;
 
 	void FinishHeaders();
 	void FinishBody();
 
-	size_t DataReceived(const void *ptr, size_t size);
+	size_t DataReceived(const void *ptr, size_t size) noexcept;
 
-	void HeaderFunction(StringView s);
+	void HeaderFunction(StringView s) noexcept;
 
-	void OnPostponeError();
+	void OnPostponeError() noexcept;
 
 	/** called by curl when new data is available */
 	static size_t _HeaderFunction(void *ptr, size_t size, size_t nmemb,
-				      void *stream);
+				      void *stream) noexcept;
 
 	/** called by curl when new data is available */
 	static size_t WriteFunction(void *ptr, size_t size, size_t nmemb,
-				    void *stream);
+				    void *stream) noexcept;
 };
 
 #endif

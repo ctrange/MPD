@@ -1,6 +1,5 @@
 /*
- * Copyright 2003-2017 The Music Player Daemon Project
- * http://www.musicpd.org
+ * Copyright (C) 2010-2015 Max Kellermann <max.kellermann@gmail.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,37 +27,43 @@
  * OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/** \file
- *
- * A very simple reference counting library.
- */
+#ifndef STRING_FORMAT_HXX
+#define STRING_FORMAT_HXX
 
-#ifndef MPD_REFCOUNT_HXX
-#define MPD_REFCOUNT_HXX
+#include "StringBuffer.hxx"
 
-#include <atomic>
+#include <stdio.h>
 
-class RefCount {
-	std::atomic_uint n;
+template<typename... Args>
+static inline void
+StringFormat(char *buffer, size_t size,
+	     const char *fmt, Args&&... args) noexcept
+{
+	snprintf(buffer, size, fmt, args...);
+}
 
-public:
-#ifndef _LIBCPP_VERSION
-	/* the "constexpr" is missing in libc++'s "atomic"
-	   implementation */
-	constexpr
-#endif
-	RefCount():n(1) {}
+template<size_t CAPACITY, typename... Args>
+static inline void
+StringFormat(StringBuffer<CAPACITY> &buffer,
+	     const char *fmt, Args&&... args) noexcept
+{
+	StringFormat(buffer.data(), buffer.capacity(), fmt, args...);
+}
 
-	void Increment() {
-		++n;
-	}
+template<size_t CAPACITY, typename... Args>
+static inline StringBuffer<CAPACITY>
+StringFormat(const char *fmt, Args&&... args) noexcept
+{
+	StringBuffer<CAPACITY> result;
+	StringFormat(result, fmt, args...);
+	return result;
+}
 
-	/**
-	 * @return true if the number of references has been dropped to 0
-	 */
-	bool Decrement() {
-		return --n == 0;
-	}
-};
+template<typename... Args>
+static inline void
+StringFormatUnsafe(char *buffer, const char *fmt, Args&&... args) noexcept
+{
+	sprintf(buffer, fmt, args...);
+}
 
 #endif

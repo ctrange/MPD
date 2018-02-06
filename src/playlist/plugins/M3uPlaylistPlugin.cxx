@@ -36,10 +36,10 @@ public:
 	virtual std::unique_ptr<DetachedSong> NextSong() override;
 };
 
-static SongEnumerator *
+static std::unique_ptr<SongEnumerator>
 m3u_open_stream(InputStreamPtr &&is)
 {
-	return new M3uPlaylist(std::move(is));
+	return std::make_unique<M3uPlaylist>(std::move(is));
 }
 
 std::unique_ptr<DetachedSong>
@@ -55,7 +55,7 @@ M3uPlaylist::NextSong()
 		line_s = Strip(line_s);
 	} while (line_s[0] == '#' || *line_s == 0);
 
-	return std::unique_ptr<DetachedSong>(new DetachedSong(line_s));
+	return std::make_unique<DetachedSong>(line_s);
 }
 
 static const char *const m3u_suffixes[] = {

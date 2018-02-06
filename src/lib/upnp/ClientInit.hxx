@@ -22,12 +22,12 @@
 
 #include "check.h"
 
-#include <upnp/upnp.h>
+#include <upnp.h>
+
+UpnpClient_Handle
+UpnpClientGlobalInit();
 
 void
-UpnpClientGlobalInit(UpnpClient_Handle &handle);
-
-void
-UpnpClientGlobalFinish();
+UpnpClientGlobalFinish() noexcept;
 
 #endif

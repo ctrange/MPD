@@ -87,7 +87,7 @@ cd mpd-version</programlisting>
         <listitem>
           <para>
             a C++14 compiler (e.g. <ulink
-            url="http://gcc.gnu.org/">gcc 4.9</ulink> or <ulink
+            url="http://gcc.gnu.org/">gcc 5.0</ulink> or <ulink
             url="http://clang.llvm.org/">clang 3.9</ulink>)
           </para>
         </listitem>
@@ -2369,6 +2369,153 @@ run</programlisting>
           <filename>mpc add smb://servername/sharename/filename.ogg</filename>
         </para>
       </section>
+
+      <section id="qobuz_input">
+        <title><varname>qobuz</varname></title>
+
+        <para>
+          Play songs from the commercial streaming service <ulink
+          url="https://www.qobuz.com/">Qobuz</ulink>.  It plays URLs in the
+          form <filename>qobuz://track/ID</filename>, e.g.:
+        </para>
+
+        <programlisting>mpc add qobuz://track/23601296</programlisting>
+
+        <informaltable>
+          <tgroup cols="2">
+            <thead>
+              <row>
+                <entry>Setting</entry>
+                <entry>Description</entry>
+              </row>
+            </thead>
+            <tbody>
+              <row>
+                <entry>
+                  <varname>app_id</varname>
+                  <parameter>ID</parameter>
+                </entry>
+                <entry>
+                  The Qobuz application id.
+                </entry>
+              </row>
+
+              <row>
+                <entry>
+                  <varname>app_secret</varname>
+                  <parameter>SECRET</parameter>
+                </entry>
+                <entry>
+                  The Qobuz application secret.
+                </entry>
+              </row>
+
+              <row>
+                <entry>
+                  <varname>username</varname>
+                  <parameter>USERNAME</parameter>
+                </entry>
+                <entry>
+                  The Qobuz user name.
+                </entry>
+              </row>
+
+              <row>
+                <entry>
+                  <varname>password</varname>
+                  <parameter>PASSWORD</parameter>
+                </entry>
+                <entry>
+                  The Qobuz password.
+                </entry>
+              </row>
+
+              <row>
+                <entry>
+                  <varname>format_id</varname>
+                  <parameter>N</parameter>
+                </entry>
+                <entry>
+                  The <ulink
+                  url="https://github.com/Qobuz/api-documentation/blob/master/endpoints/track/getFileUrl.md#parameters">Qobuz
+                  format identifier</ulink>, i.e. a number which
+                  chooses the format and quality to be requested from
+                  Qobuz.  The default is "5" (320 kbit/s MP3).
+                </entry>
+              </row>
+            </tbody>
+          </tgroup>
+        </informaltable>
+      </section>
+
+      <section id="tidal_input">
+        <title><varname>tidal</varname></title>
+
+        <para>
+          Play songs from the commercial streaming service <ulink
+          url="http://tidal.com/">Tidal</ulink>.  It plays URLs in the
+          form <filename>tidal://track/ID</filename>, e.g.:
+        </para>
+
+        <programlisting>mpc add tidal://track/59727857</programlisting>
+
+        <informaltable>
+          <tgroup cols="2">
+            <thead>
+              <row>
+                <entry>Setting</entry>
+                <entry>Description</entry>
+              </row>
+            </thead>
+            <tbody>
+              <row>
+                <entry>
+                  <varname>token</varname>
+                  <parameter>TOKEN</parameter>
+                </entry>
+                <entry>
+                  The Tidal application token.
+                </entry>
+              </row>
+
+              <row>
+                <entry>
+                  <varname>username</varname>
+                  <parameter>USERNAME</parameter>
+                </entry>
+                <entry>
+                  The Tidal user name.
+                </entry>
+              </row>
+
+              <row>
+                <entry>
+                  <varname>password</varname>
+                  <parameter>PASSWORD</parameter>
+                </entry>
+                <entry>
+                  The Tidal password.
+                </entry>
+              </row>
+
+              <row>
+                <entry>
+                  <varname>audioquality</varname>
+                  <parameter>Q</parameter>
+                </entry>
+                <entry>
+                  The Tidal "audioquality" parameter.  Possible
+                  values: <parameter>HI_RES</parameter>,
+                  <parameter>LOSSLESS</parameter>,
+                  <parameter>HIGH</parameter>,
+                  <parameter>LOW</parameter>.  Default is
+                  <parameter>HIGH</parameter>.
+                </entry>
+              </row>
+            </tbody>
+          </tgroup>
+        </informaltable>
+      </section>
     </section>
 
     <section id="decoder_plugins">
@@ -3068,8 +3215,8 @@ run</programlisting>
                 </entry>
                 <entry>
                   Sets the quality for VBR.  -1 is the lowest quality,
-                  10 is the highest quality.  Cannot be used with
-                  <varname>bitrate</varname>.
+                  10 is the highest quality.  Defaults to 3.  Cannot
+                  be used with <varname>bitrate</varname>.
                 </entry>
               </row>
               <row>
@@ -3457,6 +3604,28 @@ run</programlisting>
                   option at your own risk.
                 </entry>
               </row>
+
+              <row>
+                <entry>
+                  <varname>allowed_formats</varname>
+                  <parameter>F1 F2 ...</parameter>
+                </entry>
+                <entry>
+                  <para>
+                    Specifies a list of allowed audio formats, separated
+                    by a space.  All items may contain asterisks as a
+                    wild card, and may be followed by
+                    "<parameter>=dop</parameter>" to enable DoP (DSD
+                    over PCM) for this particular format.  The first
+                    matching format is used, and if none matches, MPD
+                    chooses the best fallback of this list.
+                  </para>
+                  <para>
+                    Example: "<parameter>96000:16:* 192000:24:*
+                    dsd64:*=dop *:dsd:*</parameter>".
+                  </para>
+                </entry>
+              </row>
             </tbody>
           </tgroup>
         </informaltable>
@@ -3512,6 +3681,52 @@ run</programlisting>
                   there is more than one control with the same name.
                   Defaults to <parameter>0</parameter> (the first
                   one).
+                </entry>
+              </row>
+            </tbody>
+          </tgroup>
+        </informaltable>
+
+        <para>
+          The following attributes can be configured at runtime using
+          the <command>outputset</command> command:
+        </para>
+
+        <informaltable>
+          <tgroup cols="2">
+            <thead>
+              <row>
+                <entry>Setting</entry>
+                <entry>Description</entry>
+              </row>
+            </thead>
+            <tbody>
+              <row>
+                <entry>
+                  <varname>dop</varname>
+                  <parameter>1|0</parameter>
+                </entry>
+                <entry>
+                  <para>
+                    Allows changing the <varname>dop</varname>
+                    configuration setting at runtime.  This takes
+                    effect the next time the output is opened.
+                  </para>
+                </entry>
+              </row>
+
+              <row>
+                <entry>
+                  <varname>allowed_formats</varname>
+                  <parameter>F1 F2 ...</parameter>
+                </entry>
+                <entry>
+                  <para>
+                    Allows changing the
+                    <varname>allowed_formats</varname> configuration
+                    setting at runtime.  This takes effect the next
+                    time the output is opened.
+                  </para>
                 </entry>
               </row>
             </tbody>

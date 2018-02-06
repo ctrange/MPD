@@ -31,12 +31,13 @@
 #include "lib/expat/ExpatParser.hxx"
 #include "fs/Traits.hxx"
 #include "event/Call.hxx"
-#include "event/DeferredMonitor.hxx"
+#include "event/DeferEvent.hxx"
 #include "thread/Mutex.hxx"
 #include "thread/Cond.hxx"
 #include "util/ChronoUtil.hxx"
 #include "util/RuntimeError.hxx"
 #include "util/StringCompare.hxx"
+#include "util/StringFormat.hxx"
 #include "util/TimeParser.hxx"
 #include "util/UriUtil.hxx"
 
@@ -60,7 +61,7 @@ public:
 	/* virtual methods from class Storage */
 	StorageFileInfo GetInfo(const char *uri_utf8, bool follow) override;
 
-	StorageDirectoryReader *OpenDirectory(const char *uri_utf8) override;
+	std::unique_ptr<StorageDirectoryReader> OpenDirectory(const char *uri_utf8) override;
 
 	std::string MapUTF8(const char *uri_utf8) const noexcept override;
 
@@ -88,7 +89,9 @@ CurlStorage::MapToRelativeUTF8(const char *uri_utf8) const noexcept
 	return PathTraitsUTF8::Relative(base.c_str(), uri_utf8);
 }
 
-class BlockingHttpRequest : protected CurlResponseHandler, DeferredMonitor {
+class BlockingHttpRequest : protected CurlResponseHandler {
+	DeferEvent defer_start;
+
 	std::exception_ptr postponed_error;
 
 	bool done = false;
@@ -101,12 +104,13 @@ protected:
 
 public:
 	BlockingHttpRequest(CurlGlobal &curl, const char *uri)
-		:DeferredMonitor(curl.GetEventLoop()),
+		:defer_start(curl.GetEventLoop(),
+			     BIND_THIS_METHOD(OnDeferredStart)),
 		 request(curl, uri, *this) {
 		// TODO: use CurlInputStream's configuration
 
 		/* start the transfer inside the IOThread */
-		DeferredMonitor::Schedule();
+		defer_start.Schedule();
 	}
 
 	void Wait() {
@@ -133,15 +137,19 @@ protected:
 	}
 
 private:
-	/* virtual methods from DeferredMonitor */
-	void RunDeferred() final {
+	/* DeferEvent callback */
+	void OnDeferredStart() noexcept {
 		assert(!done);
 
-		request.Start();
+		try {
+			request.Start();
+		} catch (...) {
+			OnError(std::current_exception());
+		}
 	}
 
 	/* virtual methods from CurlResponseHandler */
-	void OnError(std::exception_ptr e) final {
+	void OnError(std::exception_ptr e) noexcept final {
 		const std::lock_guard<Mutex> lock(mutex);
 		postponed_error = std::move(e);
 		SetDone();
@@ -187,7 +195,7 @@ ParseTimeStamp(const char *s)
 	try {
 		// TODO: make this more robust
 		return ParseTimePoint(s, "%a, %d %b %Y %T %Z");
-	} catch (const std::runtime_error &) {
+	} catch (...) {
 		return std::chrono::system_clock::time_point::min();
 	}
 }
@@ -252,9 +260,7 @@ public:
 	{
 		request.SetOption(CURLOPT_CUSTOMREQUEST, "PROPFIND");
 
-		char buffer[40];
-		sprintf(buffer, "depth: %u", depth);
-		request_headers.Append(buffer);
+		request_headers.Append(StringFormat<40>("depth: %u", depth));
 
 		request.SetOption(CURLOPT_HTTPHEADER, request_headers.Get());
 
@@ -293,11 +299,11 @@ private:
 
 	void OnData(ConstBuffer<void> _data) final {
 		const auto data = ConstBuffer<char>::FromVoid(_data);
-		Parse(data.data, data.size, false);
+		Parse(data.data, data.size);
 	}
 
 	void OnEnd() final {
-		Parse("", 0, true);
+		CompleteParse();
 		LockSetDone();
 	}
 
@@ -467,14 +473,14 @@ public:
 		:PropfindOperation(curl, uri, 1),
 		 base_path(UriPathOrSlash(uri)) {}
 
-	StorageDirectoryReader *Perform() {
+	std::unique_ptr<StorageDirectoryReader> Perform() {
 		Wait();
 		return ToReader();
 	}
 
 private:
-	StorageDirectoryReader *ToReader() {
-		return new MemoryStorageDirectoryReader(std::move(entries));
+	std::unique_ptr<StorageDirectoryReader> ToReader() {
+		return std::make_unique<MemoryStorageDirectoryReader>(std::move(entries));
 	}
 
 	/**
@@ -527,7 +533,7 @@ protected:
 	}
 };
 
-StorageDirectoryReader *
+std::unique_ptr<StorageDirectoryReader>
 CurlStorage::OpenDirectory(const char *uri_utf8)
 {
 	// TODO: escape the given URI
@@ -542,14 +548,14 @@ CurlStorage::OpenDirectory(const char *uri_utf8)
 	return HttpListDirectoryOperation(*curl, uri.c_str()).Perform();
 }
 
-static Storage *
+static std::unique_ptr<Storage>
 CreateCurlStorageURI(EventLoop &event_loop, const char *uri)
 {
 	if (strncmp(uri, "http://", 7) != 0 &&
 	    strncmp(uri, "https://", 8) != 0)
 		return nullptr;
 
-	return new CurlStorage(event_loop, uri);
+	return std::make_unique<CurlStorage>(event_loop, uri);
 }
 
 const StoragePlugin curl_storage_plugin = {

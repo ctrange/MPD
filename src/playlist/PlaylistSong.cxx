@@ -26,12 +26,10 @@
 #include "util/UriUtil.hxx"
 #include "DetachedSong.hxx"
 
-#include <stdexcept>
-
 #include <string.h>
 
 static void
-merge_song_metadata(DetachedSong &add, const DetachedSong &base)
+merge_song_metadata(DetachedSong &add, const DetachedSong &base) noexcept
 {
 	if (base.GetTag().IsDefined()) {
 		TagBuilder builder(add.GetTag());
@@ -43,7 +41,7 @@ merge_song_metadata(DetachedSong &add, const DetachedSong &base)
 }
 
 static bool
-playlist_check_load_song(DetachedSong &song, const SongLoader &loader)
+playlist_check_load_song(DetachedSong &song, const SongLoader &loader) noexcept
 try {
 	DetachedSong tmp = loader.LoadSong(song.GetURI());
 
@@ -53,13 +51,13 @@ try {
 
 	merge_song_metadata(song, tmp);
 	return true;
-} catch (const std::runtime_error &) {
+} catch (...) {
 	return false;
 }
 
 bool
 playlist_check_translate_song(DetachedSong &song, const char *base_uri,
-			      const SongLoader &loader)
+			      const SongLoader &loader) noexcept
 {
 	if (base_uri != nullptr && strcmp(base_uri, ".") == 0)
 		/* PathTraitsUTF8::GetParent() returns "." when there

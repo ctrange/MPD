@@ -106,7 +106,7 @@ public:
 	/**
 	 * Create a new root #Directory object.
 	 */
-	gcc_malloc
+	gcc_malloc gcc_returns_nonnull
 	static Directory *NewRoot() {
 		return new Directory(std::string(), nullptr);
 	}
@@ -130,7 +130,6 @@ public:
 	 *
 	 * @param name_utf8 the UTF-8 encoded name of the new sub directory
 	 */
-	gcc_malloc
 	Directory *CreateChild(const char *name_utf8);
 
 	/**

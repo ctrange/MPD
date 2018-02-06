@@ -32,7 +32,7 @@
 
 #include <mpc/mpcdec.h>
 
-#include <stdexcept>
+#include <exception>
 
 #include <math.h>
 
@@ -67,7 +67,7 @@ mpc_seek_cb(mpc_reader *reader, mpc_int32_t offset)
 	try {
 		data->is.LockSeek(offset);
 		return true;
-	} catch (const std::runtime_error &) {
+	} catch (...) {
 		return false;
 	}
 }
@@ -258,7 +258,7 @@ mpcdec_get_file_duration(InputStream &is)
 
 static bool
 mpcdec_scan_stream(InputStream &is,
-		   const TagHandler &handler, void *handler_ctx)
+		   const TagHandler &handler, void *handler_ctx) noexcept
 {
 	const auto duration = mpcdec_get_file_duration(is);
 	if (duration.IsNegative())

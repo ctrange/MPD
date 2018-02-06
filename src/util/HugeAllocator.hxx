@@ -78,7 +78,7 @@ HugeForkCow(void *p, size_t size, bool enable) noexcept;
 void
 HugeDiscard(void *p, size_t size) noexcept;
 
-#elif defined(WIN32)
+#elif defined(_WIN32)
 #include <windows.h>
 
 WritableBuffer<void>
@@ -107,7 +107,7 @@ HugeDiscard(void *p, size_t size) noexcept
 
 #include <stdint.h>
 
-WritableBuffer<void>
+static inline WritableBuffer<void>
 HugeAllocate(size_t size)
 {
 	return {new uint8_t[size], size};

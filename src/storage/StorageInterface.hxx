@@ -23,6 +23,7 @@
 #include "check.h"
 #include "Compiler.h"
 
+#include <memory>
 #include <string>
 
 struct StorageFileInfo;
@@ -32,9 +33,9 @@ class StorageDirectoryReader {
 public:
 	StorageDirectoryReader() = default;
 	StorageDirectoryReader(const StorageDirectoryReader &) = delete;
-	virtual ~StorageDirectoryReader() {}
+	virtual ~StorageDirectoryReader() noexcept {}
 
-	virtual const char *Read() = 0;
+	virtual const char *Read() noexcept = 0;
 
 	/**
 	 * Throws #std::runtime_error on error.
@@ -46,7 +47,7 @@ class Storage {
 public:
 	Storage() = default;
 	Storage(const Storage &) = delete;
-	virtual ~Storage() {}
+	virtual ~Storage() noexcept {}
 
 	/**
 	 * Throws #std::runtime_error on error.
@@ -56,7 +57,7 @@ public:
 	/**
 	 * Throws #std::runtime_error on error.
 	 */
-	virtual StorageDirectoryReader *OpenDirectory(const char *uri_utf8) = 0;
+	virtual std::unique_ptr<StorageDirectoryReader> OpenDirectory(const char *uri_utf8) = 0;
 
 	/**
 	 * Map the given relative URI to an absolute URI.
@@ -66,7 +67,7 @@ public:
 
 	/**
 	 * Map the given relative URI to a local file path.  Returns
-	 * AllocatedPath::Null() on error or if this storage does not
+	 * nullptr on error or if this storage does not
 	 * support local files.
 	 */
 	gcc_pure

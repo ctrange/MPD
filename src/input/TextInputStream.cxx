@@ -27,10 +27,10 @@
 
 #include <assert.h>
 
-TextInputStream::TextInputStream(InputStreamPtr &&_is)
+TextInputStream::TextInputStream(InputStreamPtr &&_is) noexcept
 	:is(std::move(_is)) {}
 
-TextInputStream::~TextInputStream() {}
+TextInputStream::~TextInputStream() noexcept {}
 
 char *
 TextInputStream::ReadLine()
@@ -47,7 +47,7 @@ TextInputStream::ReadLine()
 			/* line too long: terminate the current
 			   line */
 
-			assert(!dest.IsEmpty());
+			assert(!dest.empty());
 			dest[0] = 0;
 			line = buffer.Read().data;
 			buffer.Clear();
@@ -59,14 +59,7 @@ TextInputStream::ReadLine()
 		   character */
 		--dest.size;
 
-		size_t nbytes;
-
-		try {
-			nbytes = is->LockRead(dest.data, dest.size);
-		} catch (const std::runtime_error &e) {
-			LogError(e);
-			return nullptr;
-		}
+		size_t nbytes = is->LockRead(dest.data, dest.size);
 
 		buffer.Append(nbytes);
 
@@ -79,12 +72,12 @@ TextInputStream::ReadLine()
 			   line */
 
 			dest = buffer.Write();
-			assert(!dest.IsEmpty());
+			assert(!dest.empty());
 			dest[0] = 0;
 
 			auto r = buffer.Read();
 			buffer.Clear();
-			return r.IsEmpty()
+			return r.empty()
 				? nullptr
 				: r.data;
 		}

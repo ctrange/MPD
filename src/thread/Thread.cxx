@@ -30,60 +30,37 @@ Thread::Start()
 {
 	assert(!IsDefined());
 
-#ifdef WIN32
+#ifdef _WIN32
 	handle = ::CreateThread(nullptr, 0, ThreadProc, this, 0, &id);
 	if (handle == nullptr)
 		throw MakeLastError("Failed to create thread");
 #else
-#ifndef NDEBUG
-	creating = true;
-#endif
-
 	int e = pthread_create(&handle, nullptr, ThreadProc, this);
 
-	if (e != 0) {
-#ifndef NDEBUG
-		creating = false;
-#endif
+	if (e != 0)
 		throw MakeErrno(e, "Failed to create thread");
-	}
-
-	defined = true;
-#ifndef NDEBUG
-	creating = false;
-#endif
 #endif
 }
 
 void
-Thread::Join()
+Thread::Join() noexcept
 {
 	assert(IsDefined());
 	assert(!IsInside());
 
-#ifdef WIN32
+#ifdef _WIN32
 	::WaitForSingleObject(handle, INFINITE);
 	::CloseHandle(handle);
 	handle = nullptr;
 #else
 	pthread_join(handle, nullptr);
-	defined = false;
+	handle = pthread_t();
 #endif
 }
 
 inline void
-Thread::Run()
+Thread::Run() noexcept
 {
-#ifndef WIN32
-#ifndef NDEBUG
-	/* this works around a race condition that causes an assertion
-	   failure due to IsInside() spuriously returning false right
-	   after the thread has been created, and the calling thread
-	   hasn't initialised "defined" yet */
-	defined = true;
-#endif
-#endif
-
 	f();
 
 #ifdef ANDROID
@@ -91,10 +68,10 @@ Thread::Run()
 #endif
 }
 
-#ifdef WIN32
+#ifdef _WIN32
 
 DWORD WINAPI
-Thread::ThreadProc(LPVOID ctx)
+Thread::ThreadProc(LPVOID ctx) noexcept
 {
 	Thread &thread = *(Thread *)ctx;
 
@@ -105,9 +82,13 @@ Thread::ThreadProc(LPVOID ctx)
 #else
 
 void *
-Thread::ThreadProc(void *ctx)
+Thread::ThreadProc(void *ctx) noexcept
 {
 	Thread &thread = *(Thread *)ctx;
+
+#ifndef NDEBUG
+	thread.inside_handle = pthread_self();
+#endif
 
 	thread.Run();
 

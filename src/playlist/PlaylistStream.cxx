@@ -20,17 +20,18 @@
 #include "config.h"
 #include "PlaylistStream.hxx"
 #include "PlaylistRegistry.hxx"
+#include "SongEnumerator.hxx"
 #include "util/UriUtil.hxx"
 #include "input/InputStream.hxx"
 #include "input/LocalOpen.hxx"
 #include "fs/Path.hxx"
 #include "Log.hxx"
 
-#include <stdexcept>
+#include <exception>
 
 #include <assert.h>
 
-static SongEnumerator *
+static std::unique_ptr<SongEnumerator>
 playlist_open_path_suffix(Path path, Mutex &mutex, Cond &cond)
 try {
 	assert(!path.IsNull());
@@ -46,12 +47,12 @@ try {
 	auto is = OpenLocalInputStream(path, mutex, cond);
 	return playlist_list_open_stream_suffix(std::move(is),
 						suffix_utf8.c_str());
-} catch (const std::runtime_error &e) {
-	LogError(e);
+} catch (...) {
+	LogError(std::current_exception());
 	return nullptr;
 }
 
-SongEnumerator *
+std::unique_ptr<SongEnumerator>
 playlist_open_path(Path path, Mutex &mutex, Cond &cond)
 try {
 	assert(!path.IsNull());
@@ -64,23 +65,23 @@ try {
 		playlist = playlist_open_path_suffix(path, mutex, cond);
 
 	return playlist;
-} catch (const std::runtime_error &e) {
-	LogError(e);
+} catch (...) {
+	LogError(std::current_exception());
 	return nullptr;
 }
 
-SongEnumerator *
+std::unique_ptr<SongEnumerator>
 playlist_open_remote(const char *uri, Mutex &mutex, Cond &cond)
 try {
 	assert(uri_has_scheme(uri));
 
-	SongEnumerator *playlist = playlist_list_open_uri(uri, mutex, cond);
+	auto playlist = playlist_list_open_uri(uri, mutex, cond);
 	if (playlist != nullptr)
 		return playlist;
 
 	auto is = InputStream::OpenReady(uri, mutex, cond);
 	return playlist_list_open_stream(std::move(is), uri);
-} catch (const std::runtime_error &e) {
-	LogError(e);
+} catch (...) {
+	LogError(std::current_exception());
 	return nullptr;
 }

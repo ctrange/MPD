@@ -20,7 +20,7 @@
 #include "config.h"
 #include "SignalMonitor.hxx"
 
-#ifndef WIN32
+#ifndef _WIN32
 
 #include "SocketMonitor.hxx"
 #include "util/Manual.hxx"
@@ -81,7 +81,7 @@ public:
 #endif
 
 private:
-	virtual bool OnSocketReady(unsigned flags) override;
+	bool OnSocketReady(unsigned flags) noexcept override;
 };
 
 /* this should be enough - is it? */
@@ -197,7 +197,7 @@ SignalMonitorRegister(int signo, SignalHandler handler)
 }
 
 bool
-SignalMonitor::OnSocketReady(unsigned)
+SignalMonitor::OnSocketReady(unsigned) noexcept
 {
 #ifdef USE_SIGNALFD
 	int signo;

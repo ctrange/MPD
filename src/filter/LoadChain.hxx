@@ -17,50 +17,22 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#ifndef MPD_SOCKET_DEFERRED_MONITOR_HXX
-#define MPD_SOCKET_DEFERRED_MONITOR_HXX
+#ifndef MPD_FILTER_LOAD_CHAIN_HXX
+#define MPD_FILTER_LOAD_CHAIN_HXX
 
-#include "check.h"
-
-#include <boost/intrusive/list_hook.hpp>
-
-class EventLoop;
+class PreparedFilter;
 
 /**
- * Defer execution of an event into an #EventLoop.
+ * Builds a filter chain from a configuration string on the form
+ * "name1, name2, name3, ..." by looking up each name among the
+ * configured filter sections.
  *
- * This class is thread-safe.
+ * Throws std::runtime_error on error.
+ *
+ * @param chain the chain to append filters on
+ * @param spec the filter chain specification
  */
-class DeferredMonitor {
-	friend class EventLoop;
-
-	typedef boost::intrusive::list_member_hook<> ListHook;
-	ListHook list_hook;
-
-	EventLoop &loop;
-
-public:
-	DeferredMonitor(EventLoop &_loop)
-		:loop(_loop) {}
-
-	~DeferredMonitor() {
-		Cancel();
-	}
-
-	EventLoop &GetEventLoop() {
-		return loop;
-	}
-
-	void Schedule();
-	void Cancel();
-
-private:
-	bool IsPending() const {
-		return list_hook.is_linked();
-	}
-
-protected:
-	virtual void RunDeferred() = 0;
-};
+void
+filter_chain_parse(PreparedFilter &chain, const char *spec);
 
 #endif

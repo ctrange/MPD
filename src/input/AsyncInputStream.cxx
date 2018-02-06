@@ -19,7 +19,6 @@
 
 #include "config.h"
 #include "AsyncInputStream.hxx"
-#include "Domain.hxx"
 #include "tag/Tag.hxx"
 #include "thread/Cond.hxx"
 #include "event/Loop.hxx"
@@ -45,15 +44,19 @@ AsyncInputStream::AsyncInputStream(EventLoop &event_loop, const char *_url,
 
 AsyncInputStream::~AsyncInputStream()
 {
-	delete tag;
-
 	buffer.Clear();
 }
 
 void
-AsyncInputStream::SetTag(Tag *_tag) noexcept
+AsyncInputStream::SetTag(std::unique_ptr<Tag> _tag) noexcept
 {
-	delete std::exchange(tag, _tag);
+	tag = std::move(_tag);
+}
+
+void
+AsyncInputStream::ClearTag() noexcept
+{
+	tag.reset();
 }
 
 void
@@ -88,7 +91,7 @@ bool
 AsyncInputStream::IsEOF() noexcept
 {
 	return (KnownSize() && offset >= size) ||
-		(!open && buffer.IsEmpty());
+		(!open && buffer.empty());
 }
 
 void
@@ -108,7 +111,7 @@ AsyncInputStream::Seek(offset_type new_offset)
 
 	while (new_offset > offset) {
 		auto r = buffer.Read();
-		if (r.IsEmpty())
+		if (r.empty())
 			break;
 
 		const size_t nbytes =
@@ -151,7 +154,7 @@ AsyncInputStream::SeekDone() noexcept
 	cond.broadcast();
 }
 
-Tag *
+std::unique_ptr<Tag>
 AsyncInputStream::ReadTag()
 {
 	return std::exchange(tag, nullptr);
@@ -162,7 +165,7 @@ AsyncInputStream::IsAvailable() noexcept
 {
 	return postponed_exception ||
 		IsEOF() ||
-		!buffer.IsEmpty();
+		!buffer.empty();
 }
 
 size_t
@@ -176,7 +179,7 @@ AsyncInputStream::Read(void *ptr, size_t read_size)
 		Check();
 
 		r = buffer.Read();
-		if (!r.IsEmpty() || IsEOF())
+		if (!r.empty() || IsEOF())
 			break;
 
 		cond.wait(mutex);
@@ -209,7 +212,7 @@ void
 AsyncInputStream::AppendToBuffer(const void *data, size_t append_size) noexcept
 {
 	auto w = buffer.Write();
-	assert(!w.IsEmpty());
+	assert(!w.empty());
 
 	size_t nbytes = std::min(w.size, append_size);
 	memcpy(w.data, data, nbytes);
@@ -218,7 +221,7 @@ AsyncInputStream::AppendToBuffer(const void *data, size_t append_size) noexcept
 	const size_t remaining = append_size - nbytes;
 	if (remaining > 0) {
 		w = buffer.Write();
-		assert(!w.IsEmpty());
+		assert(!w.empty());
 		assert(w.size >= remaining);
 
 		memcpy(w.data, (const uint8_t *)data + nbytes, remaining);

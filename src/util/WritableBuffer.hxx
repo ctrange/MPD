@@ -60,10 +60,6 @@ struct WritableBuffer<void> {
 	constexpr WritableBuffer(pointer_type _data, size_type _size)
 		:data(_data), size(_size) {}
 
-	constexpr static WritableBuffer Null() {
-		return { nullptr, 0 };
-	}
-
 	constexpr bool IsNull() const {
 		return data == nullptr;
 	}
@@ -76,7 +72,7 @@ struct WritableBuffer<void> {
 		return data != nullptr;
 	}
 
-	constexpr bool IsEmpty() const {
+	constexpr bool empty() const {
 		return size == 0;
 	}
 };
@@ -107,16 +103,15 @@ struct WritableBuffer {
 	constexpr WritableBuffer(pointer_type _data, size_type _size)
 		:data(_data), size(_size) {}
 
+	constexpr WritableBuffer(pointer_type _data, pointer_type _end)
+		:data(_data), size(_end - _data) {}
+
 	/**
 	 * Convert array to WritableBuffer instance.
 	 */
 	template<size_type _size>
 	constexpr WritableBuffer(T (&_data)[_size])
 		:data(_data), size(_size) {}
-
-	constexpr static WritableBuffer Null() {
-		return { nullptr, 0 };
-	}
 
 	/**
 	 * Cast a WritableBuffer<void> to a WritableBuffer<T>,
@@ -138,6 +133,7 @@ struct WritableBuffer {
 	constexpr
 #endif
 	static WritableBuffer<T> FromVoid(WritableBuffer<void> other) {
+		static_assert(sizeof(T) > 0, "Empty base type");
 #ifndef NDEBUG
 		assert(other.size % sizeof(T) == 0);
 #endif
@@ -161,7 +157,7 @@ struct WritableBuffer {
 		return data != nullptr;
 	}
 
-	constexpr bool IsEmpty() const {
+	constexpr bool empty() const {
 		return size == 0;
 	}
 
@@ -201,7 +197,7 @@ struct WritableBuffer {
 #endif
 	reference_type front() const {
 #ifndef NDEBUG
-		assert(!IsEmpty());
+		assert(!empty());
 #endif
 		return data[0];
 	}
@@ -215,7 +211,7 @@ struct WritableBuffer {
 #endif
 	reference_type back() const {
 #ifndef NDEBUG
-		assert(!IsEmpty());
+		assert(!empty());
 #endif
 		return data[size - 1];
 	}
@@ -225,7 +221,7 @@ struct WritableBuffer {
 	 * not actually modify the buffer).  Buffer must not be empty.
 	 */
 	void pop_front() {
-		assert(!IsEmpty());
+		assert(!empty());
 
 		++data;
 		--size;
@@ -236,7 +232,7 @@ struct WritableBuffer {
 	 * not actually modify the buffer).  Buffer must not be empty.
 	 */
 	void pop_back() {
-		assert(!IsEmpty());
+		assert(!empty());
 
 		--size;
 	}

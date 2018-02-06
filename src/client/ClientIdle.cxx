@@ -19,34 +19,40 @@
 
 #include "config.h"
 #include "ClientInternal.hxx"
+#include "Response.hxx"
 #include "Idle.hxx"
 
 #include <assert.h>
 
+static void
+WriteIdleResponse(Response &r, unsigned flags) noexcept
+{
+	const char *const*idle_names = idle_get_names();
+	for (unsigned i = 0; idle_names[i]; ++i) {
+		if (flags & (1 << i))
+			r.Format("changed: %s\n", idle_names[i]);
+	}
+
+	r.Write("OK\n");
+}
+
 void
-Client::IdleNotify()
+Client::IdleNotify() noexcept
 {
 	assert(idle_waiting);
 	assert(idle_flags != 0);
 
-	unsigned flags = idle_flags;
-	idle_flags = 0;
+	unsigned flags = std::exchange(idle_flags, 0) & idle_subscriptions;
 	idle_waiting = false;
 
-	const char *const*idle_names = idle_get_names();
-	for (unsigned i = 0; idle_names[i]; ++i) {
-		if (flags & (1 << i) & idle_subscriptions)
-			client_printf(*this, "changed: %s\n",
-				      idle_names[i]);
-	}
-
-	Write("OK\n");
+	Response r(*this, 0);
+	WriteIdleResponse(r, flags);
 
 	timeout_event.Schedule(client_timeout);
 }
 
 void
-Client::IdleAdd(unsigned flags)
+Client::IdleAdd(unsigned flags) noexcept
 {
 	if (IsExpired())
 		return;
@@ -57,7 +63,7 @@ Client::IdleAdd(unsigned flags)
 }
 
 bool
-Client::IdleWait(unsigned flags)
+Client::IdleWait(unsigned flags) noexcept
 {
 	assert(!idle_waiting);
 

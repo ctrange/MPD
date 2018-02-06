@@ -142,10 +142,10 @@ private:
 	void Disconnect();
 
 	/* virtual methods from SocketMonitor */
-	bool OnSocketReady(unsigned flags) override;
+	bool OnSocketReady(unsigned flags) noexcept override;
 
 	/* virtual methods from IdleMonitor */
-	void OnIdle() override;
+	void OnIdle() noexcept override;
 };
 
 static constexpr struct {
@@ -361,10 +361,10 @@ ProxyDatabase::Open()
 
 	try {
 		Connect();
-	} catch (const std::runtime_error &error) {
+	} catch (...) {
 		/* this error is non-fatal, because this plugin will
 		   attempt to reconnect again automatically */
-		LogError(error);
+		LogError(std::current_exception());
 	}
 }
 
@@ -459,7 +459,7 @@ ProxyDatabase::Disconnect()
 }
 
 bool
-ProxyDatabase::OnSocketReady(gcc_unused unsigned flags)
+ProxyDatabase::OnSocketReady(gcc_unused unsigned flags) noexcept
 {
 	assert(connection != nullptr);
 
@@ -473,8 +473,8 @@ ProxyDatabase::OnSocketReady(gcc_unused unsigned flags)
 	if (idle == 0) {
 		try {
 			CheckError(connection);
-		} catch (const std::runtime_error &error) {
-			LogError(error);
+		} catch (...) {
+			LogError(std::current_exception());
 			Disconnect();
 			return false;
 		}
@@ -488,7 +488,7 @@ ProxyDatabase::OnSocketReady(gcc_unused unsigned flags)
 }
 
 void
-ProxyDatabase::OnIdle()
+ProxyDatabase::OnIdle() noexcept
 {
 	assert(connection != nullptr);
 
@@ -508,8 +508,8 @@ ProxyDatabase::OnIdle()
 	if (!mpd_send_idle_mask(connection, MPD_IDLE_DATABASE)) {
 		try {
 			ThrowError(connection);
-		} catch (const std::runtime_error &error) {
-			LogError(error);
+		} catch (...) {
+			LogError(std::current_exception());
 		}
 
 		SocketMonitor::Steal();
@@ -801,7 +801,7 @@ ProxyDatabase::VisitUniqueTags(const DatabaseSelection &selection,
 		TagBuilder tag;
 		tag.AddItem(tag_type, pair->value);
 
-		if (tag.IsEmpty())
+		if (tag.empty())
 			/* if no tag item has been added, then the
 			   given value was not acceptable
 			   (e.g. empty); forcefully insert an empty

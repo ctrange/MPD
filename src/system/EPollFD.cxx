@@ -22,7 +22,7 @@
 #include "EPollFD.hxx"
 #include "Error.hxx"
 
-#ifdef __BIONIC__
+#if defined(__BIONIC__) && __ANDROID_API__ < 21
 
 #include <sys/syscall.h>
 #include <fcntl.h>
@@ -30,7 +30,7 @@
 #define EPOLL_CLOEXEC O_CLOEXEC
 
 static inline int
-epoll_create1(int flags)
+epoll_create1(int flags) noexcept
 {
     return syscall(__NR_epoll_create1, flags);
 }

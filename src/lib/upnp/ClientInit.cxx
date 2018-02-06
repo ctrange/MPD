@@ -24,7 +24,7 @@
 #include "thread/Mutex.hxx"
 #include "util/RuntimeError.hxx"
 
-#include <upnp/upnptools.h>
+#include <upnptools.h>
 
 #include <assert.h>
 
@@ -33,7 +33,12 @@ static unsigned upnp_client_ref;
 static UpnpClient_Handle upnp_client_handle;
 
 static int
-UpnpClientCallback(Upnp_EventType et, void *evp, void *cookie)
+UpnpClientCallback(Upnp_EventType et,
+#if UPNP_VERSION >= 10800
+		   const
+#endif
+		   void *evp,
+		   void *cookie) noexcept
 {
 	if (cookie == nullptr)
 		/* this is the cookie passed to UpnpRegisterClient();
@@ -55,8 +60,8 @@ DoInit()
 					 UpnpGetErrorMessage(code));
 }
 
-void
-UpnpClientGlobalInit(UpnpClient_Handle &handle)
+UpnpClient_Handle
+UpnpClientGlobalInit()
 {
 	UpnpGlobalInit();
 
@@ -70,11 +75,11 @@ UpnpClientGlobalInit(UpnpClient_Handle &handle)
 	}
 
 	++upnp_client_ref;
-	handle = upnp_client_handle;
+	return upnp_client_handle;
 }
 
 void
-UpnpClientGlobalFinish()
+UpnpClientGlobalFinish() noexcept
 {
 	{
 		const std::lock_guard<Mutex> protect(upnp_client_init_mutex);

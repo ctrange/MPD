@@ -29,7 +29,7 @@
 #include "input/LocalOpen.hxx"
 #include "thread/Cond.hxx"
 
-#include <stdexcept>
+#include <exception>
 
 #include <assert.h>
 
@@ -46,16 +46,16 @@ class TagFileScan {
 
 public:
 	TagFileScan(Path _path_fs, const char *_suffix,
-		    const TagHandler &_handler, void *_handler_ctx)
+		    const TagHandler &_handler, void *_handler_ctx) noexcept
 		:path_fs(_path_fs), suffix(_suffix),
 		 handler(_handler), handler_ctx(_handler_ctx) ,
 		 is(nullptr) {}
 
-	bool ScanFile(const DecoderPlugin &plugin) {
+	bool ScanFile(const DecoderPlugin &plugin) noexcept {
 		return plugin.ScanFile(path_fs, handler, handler_ctx);
 	}
 
-	bool ScanStream(const DecoderPlugin &plugin) {
+	bool ScanStream(const DecoderPlugin &plugin) noexcept {
 		if (plugin.scan_stream == nullptr)
 			return false;
 
@@ -64,13 +64,13 @@ public:
 			try {
 				is = OpenLocalInputStream(path_fs,
 							  mutex, cond);
-			} catch (const std::runtime_error &) {
+			} catch (...) {
 				return false;
 			}
 		} else {
 			try {
 				is->LockRewind();
-			} catch (const std::runtime_error &) {
+			} catch (...) {
 			}
 		}
 
@@ -78,14 +78,15 @@ public:
 		return plugin.ScanStream(*is, handler, handler_ctx);
 	}
 
-	bool Scan(const DecoderPlugin &plugin) {
+	bool Scan(const DecoderPlugin &plugin) noexcept {
 		return plugin.SupportsSuffix(suffix) &&
 			(ScanFile(plugin) || ScanStream(plugin));
 	}
 };
 
 bool
-tag_file_scan(Path path_fs, const TagHandler &handler, void *handler_ctx)
+tag_file_scan(Path path_fs,
+	      const TagHandler &handler, void *handler_ctx) noexcept
 {
 	assert(!path_fs.IsNull());
 
@@ -104,12 +105,12 @@ tag_file_scan(Path path_fs, const TagHandler &handler, void *handler_ctx)
 }
 
 bool
-tag_file_scan(Path path, TagBuilder &builder)
+tag_file_scan(Path path, TagBuilder &builder) noexcept
 {
 	if (!tag_file_scan(path, full_tag_handler, &builder))
 		return false;
 
-	if (builder.IsEmpty())
+	if (builder.empty())
 		ScanGenericTags(path, full_tag_handler, &builder);
 
 	return true;

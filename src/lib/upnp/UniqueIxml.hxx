@@ -20,16 +20,16 @@
 #ifndef MPD_UPNP_UNIQUE_XML_HXX
 #define MPD_UPNP_UNIQUE_XML_HXX
 
-#include <upnp/ixml.h>
+#include <ixml.h>
 
 #include <memory>
 
 struct UpnpIxmlDeleter {
-	void operator()(IXML_Document *doc) {
+	void operator()(IXML_Document *doc) noexcept {
 		ixmlDocument_free(doc);
 	}
 
-	void operator()(IXML_NodeList *nl) {
+	void operator()(IXML_NodeList *nl) noexcept {
 		ixmlNodeList_free(nl);
 	}
 };

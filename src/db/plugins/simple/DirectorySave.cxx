@@ -83,10 +83,11 @@ directory_save(BufferedOutputStream &os, const Directory &directory)
 	}
 
 	for (const auto &child : directory.children) {
-		os.Format(DIRECTORY_DIR "%s\n", child.GetName());
+		if (child.IsMount())
+			continue;
 
-		if (!child.IsMount())
-			directory_save(os, child);
+		os.Format(DIRECTORY_DIR "%s\n", child.GetName());
+		directory_save(os, child);
 	}
 
 	for (const auto &song : directory.songs)
@@ -160,11 +161,10 @@ directory_load(TextFile &file, Directory &directory)
 			if (directory.FindSong(name) != nullptr)
 				throw FormatRuntimeError("Duplicate song '%s'", name);
 
-			DetachedSong *song = song_load(file, name);
+			auto song = song_load(file, name);
 
 			directory.AddSong(Song::NewFrom(std::move(*song),
 							directory));
-			delete song;
 		} else if ((p = StringAfterPrefix(line, PLAYLIST_META_BEGIN))) {
 			const char *name = p;
 			playlist_metadata_load(file, directory.playlists, name);

@@ -17,11 +17,18 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#ifndef MPD_INPUT_DOMAIN_HXX
-#define MPD_INPUT_DOMAIN_HXX
+#include "config.h"
+#include "DeferEvent.hxx"
+#include "Loop.hxx"
 
-class Domain;
+void
+DeferEvent::Cancel() noexcept
+{
+	loop.RemoveDeferred(*this);
+}
 
-extern const Domain input_domain;
-
-#endif
+void
+DeferEvent::Schedule() noexcept
+{
+	loop.AddDeferred(*this);
+}

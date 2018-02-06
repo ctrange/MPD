@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 Max Kellermann <max.kellermann@gmail.com>
+ * Copyright (C) 2016-2018 Max Kellermann <max.kellermann@gmail.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -58,25 +58,26 @@ public:
 	/**
 	 * Create an empty instance.
 	 */
-	CurlEasy(std::nullptr_t):handle(nullptr) {}
+	CurlEasy(std::nullptr_t) noexcept:handle(nullptr) {}
 
-	CurlEasy(CurlEasy &&src):handle(std::exchange(src.handle, nullptr)) {}
+	CurlEasy(CurlEasy &&src) noexcept
+		:handle(std::exchange(src.handle, nullptr)) {}
 
-	~CurlEasy() {
+	~CurlEasy() noexcept {
 		if (handle != nullptr)
 			curl_easy_cleanup(handle);
 	}
 
-	operator bool() const {
+	operator bool() const noexcept {
 		return handle != nullptr;
 	}
 
-	CurlEasy &operator=(CurlEasy &&src) {
+	CurlEasy &operator=(CurlEasy &&src) noexcept {
 		std::swap(handle, src.handle);
 		return *this;
 	}
 
-	CURL *Get() {
+	CURL *Get() noexcept {
 		return handle;
 	}
 
@@ -85,6 +86,10 @@ public:
 		CURLcode code = curl_easy_setopt(handle, option, value);
 		if (code != CURLE_OK)
 			throw std::runtime_error(curl_easy_strerror(code));
+	}
+
+	char *Escape(const char *string, int length=0) const noexcept {
+		return curl_easy_escape(handle, string, length);
 	}
 };
 

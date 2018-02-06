@@ -30,12 +30,13 @@
 #include "SocketMonitor.hxx"
 #include "TimerEvent.hxx"
 #include "IdleMonitor.hxx"
-#include "DeferredMonitor.hxx"
+#include "DeferEvent.hxx"
 
 #include <boost/intrusive/set.hpp>
 #include <boost/intrusive/list.hpp>
 
 #include <chrono>
+#include <atomic>
 
 #include <assert.h>
 
@@ -76,16 +77,21 @@ class EventLoop final : SocketMonitor
 
 	Mutex mutex;
 
-	typedef boost::intrusive::list<DeferredMonitor,
-				       boost::intrusive::member_hook<DeferredMonitor,
-								     DeferredMonitor::ListHook,
-								     &DeferredMonitor::list_hook>,
+	typedef boost::intrusive::list<DeferEvent,
+				       boost::intrusive::member_hook<DeferEvent,
+								     DeferEvent::ListHook,
+								     &DeferEvent::list_hook>,
 				       boost::intrusive::constant_time_size<false>> DeferredList;
 	DeferredList deferred;
 
 	std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 
-	bool quit = false;
+	std::atomic_bool quit;
+
+	/**
+	 * If this is true, then Run() has returned.
+	 */
+	std::atomic_bool dead;
 
 	/**
 	 * True when the object has been modified and another check is
@@ -113,7 +119,7 @@ public:
 	explicit EventLoop(ThreadId _thread);
 	EventLoop():EventLoop(ThreadId::GetCurrent()) {}
 
-	~EventLoop();
+	~EventLoop() noexcept;
 
 	/**
 	 * A caching wrapper for std::chrono::steady_clock::now().
@@ -129,15 +135,15 @@ public:
 	 * method is thread-safe and non-blocking: after returning, it
 	 * is not guaranteed that the EventLoop has really stopped.
 	 */
-	void Break();
+	void Break() noexcept;
 
-	bool AddFD(int _fd, unsigned flags, SocketMonitor &m) {
+	bool AddFD(int _fd, unsigned flags, SocketMonitor &m) noexcept {
 		assert(IsInside());
 
 		return poll_group.Add(_fd, flags, &m);
 	}
 
-	bool ModifyFD(int _fd, unsigned flags, SocketMonitor &m) {
+	bool ModifyFD(int _fd, unsigned flags, SocketMonitor &m) noexcept {
 		assert(IsInside());
 
 		return poll_group.Modify(_fd, flags, &m);
@@ -148,49 +154,60 @@ public:
 	 * has been closed.  This is like RemoveFD(), but does not
 	 * attempt to use #EPOLL_CTL_DEL.
 	 */
-	bool Abandon(int fd, SocketMonitor &m);
+	bool Abandon(int fd, SocketMonitor &m) noexcept;
 
-	bool RemoveFD(int fd, SocketMonitor &m);
+	bool RemoveFD(int fd, SocketMonitor &m) noexcept;
 
-	void AddIdle(IdleMonitor &i);
-	void RemoveIdle(IdleMonitor &i);
+	void AddIdle(IdleMonitor &i) noexcept;
+	void RemoveIdle(IdleMonitor &i) noexcept;
 
 	void AddTimer(TimerEvent &t,
-		      std::chrono::steady_clock::duration d);
-	void CancelTimer(TimerEvent &t);
+		      std::chrono::steady_clock::duration d) noexcept;
+	void CancelTimer(TimerEvent &t) noexcept;
 
 	/**
-	 * Schedule a call to DeferredMonitor::RunDeferred().
+	 * Schedule a call to DeferEvent::RunDeferred().
 	 *
 	 * This method is thread-safe.
 	 */
-	void AddDeferred(DeferredMonitor &d);
+	void AddDeferred(DeferEvent &d) noexcept;
 
 	/**
-	 * Cancel a pending call to DeferredMonitor::RunDeferred().
+	 * Cancel a pending call to DeferEvent::RunDeferred().
 	 * However after returning, the call may still be running.
 	 *
 	 * This method is thread-safe.
 	 */
-	void RemoveDeferred(DeferredMonitor &d);
+	void RemoveDeferred(DeferEvent &d) noexcept;
 
 	/**
 	 * The main function of this class.  It will loop until
 	 * Break() gets called.  Can be called only once.
 	 */
-	void Run();
+	void Run() noexcept;
 
 private:
 	/**
-	 * Invoke all pending DeferredMonitors.
+	 * Invoke all pending DeferEvents.
 	 *
 	 * Caller must lock the mutex.
 	 */
-	void HandleDeferred();
+	void HandleDeferred() noexcept;
 
-	virtual bool OnSocketReady(unsigned flags) override;
+	/**
+	 * Invoke all expired #TimerEvent instances and return the
+	 * duration until the next timer expires.  Returns a negative
+	 * duration if there is no timeout.
+	 */
+	std::chrono::steady_clock::duration HandleTimers() noexcept;
+
+	bool OnSocketReady(unsigned flags) noexcept override;
 
 public:
+	gcc_pure
+	bool IsDead() const noexcept {
+		return dead;
+	}
 
 	/**
 	 * Are we currently running inside this EventLoop's thread?

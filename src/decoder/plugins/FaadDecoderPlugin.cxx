@@ -31,7 +31,7 @@
 
 #include <neaacdec.h>
 
-#include <stdexcept>
+#include <exception>
 
 #include <assert.h>
 #include <string.h>
@@ -127,7 +127,7 @@ adts_song_duration(DecoderBuffer &buffer)
 
 		if (frames == 0) {
 			auto data = ConstBuffer<uint8_t>::FromVoid(buffer.Read());
-			assert(!data.IsEmpty());
+			assert(!data.empty());
 			assert(frame_length <= data.size);
 
 			sample_rate = adts_sample_rates[(data.data[2] & 0x3c) >> 2];
@@ -196,7 +196,7 @@ faad_song_duration(DecoderBuffer &buffer, InputStream &is)
 
 		try {
 			is.LockSeek(tagsize);
-		} catch (const std::runtime_error &) {
+		} catch (...) {
 		}
 
 		buffer.Clear();
@@ -255,7 +255,7 @@ faad_decoder_init(NeAACDecHandle decoder, DecoderBuffer &buffer,
 		  AudioFormat &audio_format)
 {
 	auto data = ConstBuffer<uint8_t>::FromVoid(buffer.Read());
-	if (data.IsEmpty())
+	if (data.empty())
 		throw std::runtime_error("Empty file");
 
 	uint8_t channels;
@@ -283,7 +283,7 @@ faad_decoder_decode(NeAACDecHandle decoder, DecoderBuffer &buffer,
 		    NeAACDecFrameInfo *frame_info)
 {
 	auto data = ConstBuffer<uint8_t>::FromVoid(buffer.Read());
-	if (data.IsEmpty())
+	if (data.empty())
 		return nullptr;
 
 	return NeAACDecDecode(decoder, frame_info,
@@ -316,7 +316,7 @@ faad_get_file_time(InputStream &is)
 		try {
 			faad_decoder_init(decoder, buffer, audio_format);
 			recognized = true;
-		} catch (const std::runtime_error &e) {
+		} catch (...) {
 		}
 	}
 
@@ -415,7 +415,7 @@ faad_stream_decode(DecoderClient &client, InputStream &is)
 
 static bool
 faad_scan_stream(InputStream &is,
-		 const TagHandler &handler, void *handler_ctx)
+		 const TagHandler &handler, void *handler_ctx) noexcept
 {
 	auto result = faad_get_file_time(is);
 	if (!result.first)

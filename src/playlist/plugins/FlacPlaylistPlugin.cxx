@@ -80,13 +80,13 @@ FlacPlaylist::NextSong()
 		? c.tracks[next_track].offset
 		: total_samples;
 
-	std::unique_ptr<DetachedSong> song(new DetachedSong(uri));
+	auto song = std::make_unique<DetachedSong>(uri);
 	song->SetStartTime(SongTime::FromScale(start, sample_rate));
 	song->SetEndTime(SongTime::FromScale(end, sample_rate));
 	return song;
 }
 
-static SongEnumerator *
+static std::unique_ptr<SongEnumerator>
 flac_playlist_open_uri(const char *uri,
 		       gcc_unused Mutex &mutex, gcc_unused Cond &cond)
 {
@@ -109,7 +109,7 @@ flac_playlist_open_uri(const char *uri,
 		return nullptr;
 	}
 
-	return new FlacPlaylist(uri, cuesheet, streaminfo);
+	return std::make_unique<FlacPlaylist>(uri, cuesheet, streaminfo);
 }
 
 static const char *const flac_playlist_suffixes[] = {

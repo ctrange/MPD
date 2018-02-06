@@ -23,7 +23,7 @@
 #include "mixer/Listener.hxx"
 #include "output/OutputAPI.hxx"
 #include "event/MultiSocketMonitor.hxx"
-#include "event/DeferredMonitor.hxx"
+#include "event/DeferEvent.hxx"
 #include "event/Call.hxx"
 #include "util/ASCII.hxx"
 #include "util/ReusableArray.hxx"
@@ -43,32 +43,32 @@ extern "C" {
 #define VOLUME_MIXER_ALSA_CONTROL_DEFAULT	"PCM"
 static constexpr unsigned VOLUME_MIXER_ALSA_INDEX_DEFAULT = 0;
 
-class AlsaMixerMonitor final : MultiSocketMonitor, DeferredMonitor {
+class AlsaMixerMonitor final : MultiSocketMonitor {
+	DeferEvent defer_invalidate_sockets;
+
 	snd_mixer_t *mixer;
 
 	ReusableArray<pollfd> pfd_buffer;
 
 public:
 	AlsaMixerMonitor(EventLoop &_loop, snd_mixer_t *_mixer)
-		:MultiSocketMonitor(_loop), DeferredMonitor(_loop),
+		:MultiSocketMonitor(_loop),
+		 defer_invalidate_sockets(_loop,
+					  BIND_THIS_METHOD(InvalidateSockets)),
 		 mixer(_mixer) {
-		DeferredMonitor::Schedule();
+		defer_invalidate_sockets.Schedule();
 	}
 
 	~AlsaMixerMonitor() {
 		BlockingCall(MultiSocketMonitor::GetEventLoop(), [this](){
 				MultiSocketMonitor::Reset();
-				DeferredMonitor::Cancel();
+				defer_invalidate_sockets.Cancel();
 			});
 	}
 
 private:
-	virtual void RunDeferred() override {
-		InvalidateSockets();
-	}
-
-	virtual std::chrono::steady_clock::duration PrepareSockets() override;
-	virtual void DispatchSockets() override;
+	std::chrono::steady_clock::duration PrepareSockets() noexcept override;
+	void DispatchSockets() noexcept override;
 };
 
 class AlsaMixer final : public Mixer {
@@ -103,7 +103,7 @@ public:
 static constexpr Domain alsa_mixer_domain("alsa_mixer");
 
 std::chrono::steady_clock::duration
-AlsaMixerMonitor::PrepareSockets()
+AlsaMixerMonitor::PrepareSockets() noexcept
 {
 	if (mixer == nullptr) {
 		ClearSocketList();
@@ -114,7 +114,7 @@ AlsaMixerMonitor::PrepareSockets()
 }
 
 void
-AlsaMixerMonitor::DispatchSockets()
+AlsaMixerMonitor::DispatchSockets() noexcept
 {
 	assert(mixer != nullptr);
 
@@ -149,7 +149,7 @@ alsa_mixer_elem_callback(snd_mixer_elem_t *elem, unsigned mask)
 		try {
 			int volume = mixer.GetVolume();
 			mixer.listener.OnMixerVolumeChanged(mixer, volume);
-		} catch (const std::runtime_error &) {
+		} catch (...) {
 		}
 	}
 
@@ -282,7 +282,9 @@ AlsaMixer::SetVolume(unsigned volume)
 {
 	assert(handle != nullptr);
 
-	int err = set_normalized_playback_volume(elem, 0.01*volume, 1);
+	double cur = get_normalized_playback_volume(elem, SND_MIXER_SCHN_FRONT_LEFT);
+	int delta = volume - lrint(100.*cur);
+	int err = set_normalized_playback_volume(elem, cur + 0.01*delta, delta);
 	if (err < 0)
 		throw FormatRuntimeError("failed to set ALSA volume: %s",
 					 snd_strerror(err));

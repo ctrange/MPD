@@ -10,8 +10,7 @@ process to install
 before using this fork please take a look at the following article about how to compile mpd, it will help you solve a lot of problems. Please take a look at the mpd compiling guide if you have compiling problems. This fork is compiled on rpi2, odroid c2, both works. If it does not build on your platform, mostly likely missing libs.
 
 https://www.musicpd.org/doc/user/install_source.html
-
-sudo apt-get install build-essential automake autoconf libtool pkg-config libcurl4-openssl-dev intltool libxml2-dev libgtk2.0-dev libnotify-dev libglib2.0-dev libevent-dev dh-make libupnp-dev libboost-dev libmpdclient-dev libsystemd-dev libicu-dev libexpat1-dev libssl-dev libpugixml-dev libavformat-dev
+apt-get install build-essential automake autoconf libtool pkg-config libcurl4-openssl-dev intltool libxml2-dev libgtk2.0-dev libnotify-dev libglib2.0-dev libevent-dev dh-make  libboost-dev libmpdclient-dev libsystemd-dev libicu-dev libexpat1-dev libssl-dev libpugixml-dev libavformat-dev
 
 git clone https://github.com/xxxbugxxxx/MPD cd MPD ./autogen.sh ./configure --enable-sacdiso --disable-iso9660 --with-systemduserunitdir=/usr/lib/systemd/user
 

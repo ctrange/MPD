@@ -12,6 +12,12 @@ before using this fork please take a look at the following article about how to 
 https://www.musicpd.org/doc/user/install_source.html
 apt-get install build-essential automake autoconf libtool pkg-config libcurl4-openssl-dev intltool libxml2-dev libgtk2.0-dev libnotify-dev libglib2.0-dev libevent-dev dh-make  libboost-dev libmpdclient-dev libsystemd-dev libicu-dev libexpat1-dev libssl-dev libpugixml-dev libavformat-dev
 
+wget https://downloads.sourceforge.net/project/pupnp/pupnp/libUPnP%201.6.25/libupnp-1.6.25.tar.bz2
+tar -xvf *.bz2
+cd lib*
+./configure
+make install
+
 git clone https://github.com/xxxbugxxxx/MPD cd MPD ./autogen.sh ./configure --enable-sacdiso --disable-iso9660 --with-systemduserunitdir=/usr/lib/systemd/user
 
 make install CPPFLAGS="$(pkg-config --cflags glib-2.0)" LIBS="$(pkg-config --libs glib-2.0)"
